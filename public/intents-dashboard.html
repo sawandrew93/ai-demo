@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Customer Intents Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .header { background: #28a745; color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .container { width: 100%; margin: 2rem 0; padding: 0 1rem; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: #28a745; }
+        .stat-label { color: #666; margin-top: 0.5rem; }
+        .intents-table { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow-x: auto; }
+        .table { width: 100%; min-width: 1200px; border-collapse: collapse; }
+        .table th, .table td { padding: 1rem; text-align: left; border-bottom: 1px solid #eee; }
+        .table th { background: #f8f9fa; font-weight: 600; }
+        .intent-category { padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
+        .intent-category.general { background: #e3f2fd; color: #1976d2; }
+        .intent-category.pricing { background: #fff3e0; color: #f57c00; }
+        .intent-category.support { background: #e8f5e8; color: #2e7d32; }
+        .intent-category.trial { background: #f3e5f5; color: #7b1fa2; }
+        .response-type { padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
+        .response-type.ai_response { background: #e8f5e8; color: #2e7d32; }
+        .response-type.handoff_suggestion { background: #fff3e0; color: #f57c00; }
+        .response-type.no_knowledge { background: #ffebee; color: #c62828; }
+        .customer-message { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+        .customer-message:hover { white-space: normal; }
+        .confidence-score { font-weight: bold; }
+        .confidence-score.high { color: #2e7d32; }
+        .confidence-score.medium { color: #f57c00; }
+        .confidence-score.low { color: #c62828; }
+        .loading { text-align: center; padding: 2rem; color: #666; }
+        .no-data { text-align: center; padding: 2rem; color: #666; }
+        .filters { background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; gap: 0.5rem; }
+        .filter-group label { font-weight: 500; color: #333; }
+        .filter-group select, .filter-group input { padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+        .btn { padding: 0.5rem 1rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #218838; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Customer Intents Dashboard</h1>
+        <div>
+            <a href="/feedback" class="btn">📊 Feedback</a>
+            <a href="/knowledge-base" class="btn" style="margin-left: 10px;">🧠 Knowledge Base</a>
+            <a href="/agent" class="btn" style="margin-left: 10px;">🏠 Agent Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="filters">
+            <div class="filter-group">
+                <label>Intent Category</label>
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                    <option value="general">General</option>
+                    <option value="pricing">Pricing</option>
+                    <option value="support">Support</option>
+                    <option value="trial">Trial</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Response Type</label>
+                <select id="responseFilter">
+                    <option value="">All Types</option>
+                    <option value="ai_response">AI Response</option>
+                    <option value="handoff_suggestion">Handoff Suggested</option>
+                    <option value="no_knowledge">No Knowledge</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Date From</label>
+                <input type="date" id="dateFrom">
+            </div>
+            <div class="filter-group">
+                <label>Date To</label>
+                <input type="date" id="dateTo">
+            </div>
+            <div class="filter-group">
+                <label>Country</label>
+                <input type="text" id="countryFilter" placeholder="Enter country">
+            </div>
+            <div class="filter-group">
+                <label>Customer Name</label>
+                <input type="text" id="nameFilter" placeholder="Enter name">
+            </div>
+            <div class="filter-group">
+                <label>Customer Email</label>
+                <input type="text" id="emailFilter" placeholder="Enter email">
+            </div>
+            <div class="filter-group">
+                <label>&nbsp;</label>
+                <button onclick="applyFilters()" class="btn">Apply Filters</button>
+            </div>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalIntents">-</div>
+                <div class="stat-label">Total Intents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="aiResponses">-</div>
+                <div class="stat-label">AI Responses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="handoffSuggestions">-</div>
+                <div class="stat-label">Handoff Suggestions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="noKnowledge">-</div>
+                <div class="stat-label">No Knowledge Found</div>
+            </div>
+        </div>
+
+        <div class="intents-table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Customer Message</th>
+                        <th>Intent</th>
+                        <th>Category</th>
+                        <th>Confidence</th>
+                        <th>Response Type</th>
+                        <th>Customer Name</th>
+                        <th>Email</th>
+                        <th>Country</th>
+                        <th>Session</th>
+                    </tr>
+                </thead>
+                <tbody id="intentsTableBody">
+                    <tr><td colspan="10" class="loading">Loading intents...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function loadIntents() {
+            try {
+                const token = localStorage.getItem('agentToken');
+                if (!token) {
+                    window.location.href = '/agent';
+                    return;
+                }
+
+                const params = new URLSearchParams({ limit: 50 });
+
+                // Add filters
+                const categoryFilter = document.getElementById('categoryFilter').value;
+                const responseFilter = document.getElementById('responseFilter').value;
+                const dateFrom = document.getElementById('dateFrom').value;
+                const dateTo = document.getElementById('dateTo').value;
+                const countryFilter = document.getElementById('countryFilter').value;
+                const nameFilter = document.getElementById('nameFilter').value;
+                const emailFilter = document.getElementById('emailFilter').value;
+
+                if (categoryFilter) params.append('intent_category', categoryFilter);
+                if (responseFilter) params.append('response_type', responseFilter);
+                if (dateFrom) params.append('date_from', dateFrom);
+                if (dateTo) params.append('date_to', dateTo);
+                if (countryFilter) params.append('customer_country', countryFilter);
+                if (nameFilter) params.append('customer_name', nameFilter);
+                if (emailFilter) params.append('customer_email', emailFilter);
+
+                const response = await fetch(`/api/intents?${params}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load intents');
+
+                const data = await response.json();
+                displayIntents(data);
+                updateStats(data);
+            } catch (error) {
+                console.error('Error loading intents:', error);
+                document.getElementById('intentsTableBody').innerHTML = 
+                    '<tr><td colspan="10" class="no-data">Error loading intents</td></tr>';
+            }
+        }
+
+        function applyFilters() {
+            loadIntents();
+        }
+
+        function displayIntents(intents) {
+            const tbody = document.getElementById('intentsTableBody');
+            
+            if (intents.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="no-data">No intents found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = intents.map(intent => `
+                <tr>
+                    <td>${new Date(intent.created_at).toLocaleDateString()}</td>
+                    <td>
+                        <div class="customer-message" title="${intent.customer_message}">
+                            ${intent.customer_message}
+                        </div>
+                    </td>
+                    <td>${intent.detected_intent || '-'}</td>
+                    <td>
+                        <span class="intent-category ${intent.intent_category || 'general'}">
+                            ${intent.intent_category || 'general'}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="confidence-score ${getConfidenceClass(intent.confidence_score)}">
+                            ${intent.confidence_score ? (intent.confidence_score * 100).toFixed(1) + '%' : '-'}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="response-type ${intent.response_type}">
+                            ${formatResponseType(intent.response_type)}
+                        </span>
+                    </td>
+                    <td>${(intent.customer_firstname && intent.customer_lastname) ? intent.customer_firstname + ' ' + intent.customer_lastname : '-'}</td>
+                    <td>${intent.customer_email || '-'}</td>
+                    <td>${intent.customer_country || '-'}</td>
+                    <td style="font-family: monospace; font-size: 0.8em;">${intent.session_id.substring(0, 12)}...</td>
+                </tr>
+            `).join('');
+        }
+
+        function updateStats(intents) {
+            const total = intents.length;
+            const aiResponses = intents.filter(i => i.response_type === 'ai_response').length;
+            const handoffSuggestions = intents.filter(i => i.response_type === 'handoff_suggestion').length;
+            const noKnowledge = intents.filter(i => i.response_type === 'no_knowledge').length;
+
+            document.getElementById('totalIntents').textContent = total;
+            document.getElementById('aiResponses').textContent = aiResponses;
+            document.getElementById('handoffSuggestions').textContent = handoffSuggestions;
+            document.getElementById('noKnowledge').textContent = noKnowledge;
+        }
+
+        function getConfidenceClass(score) {
+            if (!score) return '';
+            if (score >= 0.7) return 'high';
+            if (score >= 0.4) return 'medium';
+            return 'low';
+        }
+
+        function formatResponseType(type) {
+            switch(type) {
+                case 'ai_response': return 'AI Response';
+                case 'handoff_suggestion': return 'Handoff Suggested';
+                case 'no_knowledge': return 'No Knowledge';
+                default: return type;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadIntents();
+        });
+    </script>
+    <script src="agent-notifications.js"></script>
+</body>
+</html>
