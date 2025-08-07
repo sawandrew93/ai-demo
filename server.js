@@ -250,8 +250,8 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
                       userMessage.toLowerCase().startsWith('are');
 
     let context;
-    if (isQuestion && knowledgeResults.length === 0) {
-      // No knowledge found for question - suggest human handoff
+    if (isQuestion && (knowledgeResults.length === 0 || (knowledgeResults.length > 0 && knowledgeResults[0].similarity < 0.4))) {
+      // No knowledge found or low similarity - suggest human handoff
       return {
         type: 'handoff_suggestion',
         message: "I'm sorry, I couldn't find specific information about that. Would you like to connect with human support?",

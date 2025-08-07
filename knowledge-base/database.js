@@ -62,14 +62,21 @@ class KnowledgeBaseDB {
       const { data, error } = await this.supabase.rpc('match_documents', {
         query_embedding: queryEmbedding,
         match_threshold: threshold,
-        match_count: limit
+        match_count: limit * 2 // Get more results to ensure we find recent content
       });
 
       if (error) {
         throw error;
       }
 
-      return data || [];
+      // Sort by created_at descending to prioritize recent documents
+      const sortedResults = (data || []).sort((a, b) => {
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        return dateB - dateA;
+      });
+
+      return sortedResults.slice(0, limit);
     } catch (error) {
       console.error('❌ Error searching documents:', error);
       throw error;
