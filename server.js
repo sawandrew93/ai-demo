@@ -52,7 +52,7 @@ const agentReconnectTimeouts = new Map();
 const agentUsers = new Map([
   ['agent1', {
     id: 'agent1',
-    username: 'john_doe',
+    username: 'saw.andrew',
     email: 'john@company.com',
     name: 'John Doe',
     password: '$2b$10$example_hash_here',
@@ -72,7 +72,7 @@ const agentUsers = new Map([
 
 async function initializeAgentUsers() {
   const users = [
-    { id: 'agent1', username: 'john_doe', email: 'john@company.com', name: 'John Doe', password: 'password123', role: 'agent' },
+    { id: 'agent1', username: 'saw.andrew', email: 'john@company.com', name: 'John Doe', password: 'asd123!@#', role: 'agent' },
     { id: 'agent2', username: 'jane_smith', email: 'jane@company.com', name: 'Jane Smith', password: 'password456', role: 'senior_agent' }
   ];
 
