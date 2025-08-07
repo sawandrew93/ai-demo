@@ -45,6 +45,7 @@ class PDFIngestionService {
           const docTitle = title || chunk.title || result.metadata.filename.replace(/\.[^/.]+$/, '');
           console.log(`📝 Inserting chunk with title: ${docTitle}`);
           console.log(`📄 Chunk content preview: ${chunk.content.substring(0, 100)}...`);
+          console.log(`🧮 Embedding length: ${embeddingResult.embedding?.length}`);
           documents.push({
             title: docTitle,
             content: chunk.content,
@@ -58,6 +59,8 @@ class PDFIngestionService {
             source_type: fileType || result.metadata.source_type,
             source_url: filePath
           });
+        } else {
+          console.error(`❌ Failed to generate embedding for chunk ${i}: ${embeddingResult.error}`);
         } else {
           console.warn(`⚠️ Skipping chunk ${i} due to embedding error: ${embeddingResult.error}`);
         }
