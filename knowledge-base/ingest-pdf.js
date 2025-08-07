@@ -61,6 +61,7 @@ class PDFIngestionService {
           });
         } else {
           console.error(`❌ Failed to generate embedding for chunk ${i}: ${embeddingResult.error}`);
+        }
         } else {
           console.warn(`⚠️ Skipping chunk ${i} due to embedding error: ${embeddingResult.error}`);
         }
