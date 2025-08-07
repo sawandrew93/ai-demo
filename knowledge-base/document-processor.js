@@ -95,14 +95,26 @@ class DocumentProcessor {
         const sheetData = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
         
         // Convert array data to readable text
-        let sheetText = `Sheet: ${sheetName}\n`;
+        let sheetText = `Sheet ${sheetName}: `;
+        let headers = [];
+        
         sheetData.forEach((row, rowIndex) => {
           if (row.some(cell => cell !== '')) { // Skip empty rows
-            sheetText += row.join(' | ') + '\n';
+            if (rowIndex === 0) {
+              // First row as headers
+              headers = row.filter(cell => cell !== '');
+              sheetText += `Headers: ${headers.join(', ')}. `;
+            } else {
+              // Data rows
+              const rowData = row.filter(cell => cell !== '').join(' ');
+              if (rowData.trim()) {
+                sheetText += `Row ${rowIndex}: ${rowData}. `;
+              }
+            }
           }
         });
         
-        text += sheetText + '\n';
+        text += sheetText + ' ';
       });
       
       const metadata = {
@@ -174,7 +186,7 @@ class DocumentProcessor {
     return text
       .replace(/\s+/g, ' ') // Replace multiple whitespace with single space
       .replace(/\n+/g, ' ') // Replace newlines with space
-      .replace(/[^\w\s.,!?;:()\-"']/g, '') // Remove special characters except basic punctuation
+      .replace(/[^\w\s.,!?;:()\-"'|]/g, '') // Keep pipe character for Excel data
       .trim();
   }
 
