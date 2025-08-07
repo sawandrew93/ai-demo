@@ -95,21 +95,13 @@ class DocumentProcessor {
         const sheetData = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
         
         // Convert array data to readable text
-        let sheetText = `Sheet ${sheetName}: `;
-        let headers = [];
+        let sheetText = `Data from sheet ${sheetName}: `;
         
         sheetData.forEach((row, rowIndex) => {
           if (row.some(cell => cell !== '')) { // Skip empty rows
-            if (rowIndex === 0) {
-              // First row as headers
-              headers = row.filter(cell => cell !== '');
-              sheetText += `Headers: ${headers.join(', ')}. `;
-            } else {
-              // Data rows
-              const rowData = row.filter(cell => cell !== '').join(' ');
-              if (rowData.trim()) {
-                sheetText += `Row ${rowIndex}: ${rowData}. `;
-              }
+            const cleanRow = row.map(cell => String(cell).trim()).filter(cell => cell !== '');
+            if (cleanRow.length > 0) {
+              sheetText += cleanRow.join(' ') + '. ';
             }
           }
         });
