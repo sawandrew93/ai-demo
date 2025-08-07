@@ -28,6 +28,7 @@ class PDFIngestionService {
       const result = await this.processor.processDocument(filePath, title, fileType);
       
       console.log(`📝 Processing ${result.chunks.length} chunks...`);
+      console.log(`📄 Sample chunk: ${result.chunks[0]?.content?.substring(0, 200)}...`);
       
       // Generate embeddings for all chunks
       const embeddings = await this.embeddingService.generateBatchEmbeddings(
