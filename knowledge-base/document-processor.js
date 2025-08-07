@@ -22,7 +22,7 @@ class DocumentProcessor {
         pages: data.numpages,
         info: data.info,
         source_type: 'pdf',
-        filename: filePath.split('\\').pop()
+        filename: filePath.split(/[\\\/]/).pop()
       };
 
       console.log(`✅ Extracted ${text.length} characters from ${data.numpages} pages`);
@@ -44,7 +44,7 @@ class DocumentProcessor {
       const text = await fs.readFile(filePath, 'utf-8');
       const metadata = {
         source_type: 'text',
-        filename: filePath.split('\\').pop()
+        filename: filePath.split(/[\\\/]/).pop()
       };
 
       console.log(`✅ Extracted ${text.length} characters`);
@@ -67,10 +67,11 @@ class DocumentProcessor {
       const text = result.value;
       const metadata = {
         source_type: 'word',
-        filename: filePath.split('\\').pop()
+        filename: filePath.split(/[\\\/]/).pop()
       };
 
       console.log(`✅ Extracted ${text.length} characters from Word document`);
+      console.log(`📝 Sample content: ${text.substring(0, 200)}...`);
       
       return {
         text: text,
@@ -91,17 +92,27 @@ class DocumentProcessor {
       
       workbook.SheetNames.forEach(sheetName => {
         const sheet = workbook.Sheets[sheetName];
-        const sheetText = xlsx.utils.sheet_to_txt(sheet);
-        text += `Sheet: ${sheetName}\n${sheetText}\n\n`;
+        const sheetData = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        
+        // Convert array data to readable text
+        let sheetText = `Sheet: ${sheetName}\n`;
+        sheetData.forEach((row, rowIndex) => {
+          if (row.some(cell => cell !== '')) { // Skip empty rows
+            sheetText += row.join(' | ') + '\n';
+          }
+        });
+        
+        text += sheetText + '\n';
       });
       
       const metadata = {
         source_type: 'excel',
-        filename: filePath.split('\\').pop(),
+        filename: filePath.split(/[\\\/]/).pop(),
         sheets: workbook.SheetNames.length
       };
 
       console.log(`✅ Extracted ${text.length} characters from ${workbook.SheetNames.length} sheets`);
+      console.log(`📝 Sample content: ${text.substring(0, 200)}...`);
       
       return {
         text: text,
