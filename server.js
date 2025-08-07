@@ -109,6 +109,13 @@ async function searchKnowledgeBase(query, limit = 5) {
   try {
     console.log('🔍 Searching knowledge base for:', query);
     
+    // First, let's see what documents are actually in the database
+    const allDocs = await knowledgeDB.getAllDocuments(10);
+    console.log('📁 Available documents in database:');
+    allDocs.forEach(doc => {
+      console.log(`  - Title: "${doc.title}", Source: ${doc.source_type}, Content preview: ${doc.content?.substring(0, 50)}...`);
+    });
+    
     // Generate embedding for the query
     const queryEmbedding = await generateEmbedding(query);
     console.log('✅ Generated embedding, length:', queryEmbedding.length);
