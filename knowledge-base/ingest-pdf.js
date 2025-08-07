@@ -42,7 +42,7 @@ class PDFIngestionService {
         
         if (embeddingResult.success) {
           documents.push({
-            title: chunk.title || title || result.metadata.filename,
+            title: title || chunk.title || result.metadata.filename.replace(/\.[^/.]+$/, ''),
             content: chunk.content,
             metadata: {
               ...result.metadata,

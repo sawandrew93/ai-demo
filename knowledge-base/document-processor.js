@@ -204,8 +204,9 @@ class DocumentProcessor {
       // Clean the extracted text
       const cleanedText = this.cleanText(result.text);
       
-      // Create chunks
-      const chunks = this.chunkText(cleanedText, title || result.metadata.filename);
+      // Create chunks with the provided title
+      const documentTitle = title || result.metadata.filename.replace(/\.[^/.]+$/, '');
+      const chunks = this.chunkText(cleanedText, documentTitle);
       
       return {
         chunks: chunks,
