@@ -42,8 +42,11 @@ class PDFIngestionService {
         const embeddingResult = embeddings[i];
         
         if (embeddingResult.success) {
+          const docTitle = title || chunk.title || result.metadata.filename.replace(/\.[^/.]+$/, '');
+          console.log(`📝 Inserting chunk with title: ${docTitle}`);
+          console.log(`📄 Chunk content preview: ${chunk.content.substring(0, 100)}...`);
           documents.push({
-            title: title || chunk.title || result.metadata.filename.replace(/\.[^/.]+$/, ''),
+            title: docTitle,
             content: chunk.content,
             metadata: {
               ...result.metadata,
