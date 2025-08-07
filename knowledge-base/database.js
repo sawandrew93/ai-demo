@@ -57,57 +57,19 @@ class KnowledgeBaseDB {
     }
   }
 
-  async searchSimilarDocuments(queryEmbedding, threshold = 0.3, limit = 5) {
+  async searchSimilarDocuments(queryEmbedding, threshold = 0.1, limit = 5) {
     try {
-      // Get all documents and calculate similarity manually to ensure proper sorting
-      const { data: allDocs, error } = await this.supabase
-        .from('documents')
-        .select('id, title, content, metadata, created_at, embedding')
-        .order('created_at', { ascending: false });
+      const { data, error } = await this.supabase.rpc('match_documents', {
+        query_embedding: queryEmbedding,
+        match_threshold: threshold,
+        match_count: limit
+      });
 
       if (error) {
         throw error;
       }
 
-      // Calculate cosine similarity for each document
-      const results = [];
-      for (const doc of allDocs || []) {
-        if (doc.embedding && doc.embedding.length === queryEmbedding.length) {
-          // Calculate cosine similarity
-          let dotProduct = 0;
-          let normA = 0;
-          let normB = 0;
-          
-          for (let i = 0; i < queryEmbedding.length; i++) {
-            dotProduct += queryEmbedding[i] * doc.embedding[i];
-            normA += queryEmbedding[i] * queryEmbedding[i];
-            normB += doc.embedding[i] * doc.embedding[i];
-          }
-          
-          const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-          
-          if (similarity > threshold) {
-            results.push({
-              id: doc.id,
-              title: doc.title,
-              content: doc.content,
-              metadata: doc.metadata,
-              similarity: similarity,
-              created_at: doc.created_at
-            });
-          }
-        }
-      }
-
-      // Sort by similarity descending, then by created_at descending for ties
-      results.sort((a, b) => {
-        if (Math.abs(a.similarity - b.similarity) < 0.01) {
-          return new Date(b.created_at) - new Date(a.created_at);
-        }
-        return b.similarity - a.similarity;
-      });
-
-      return results.slice(0, limit);
+      return data || [];
     } catch (error) {
       console.error('❌ Error searching documents:', error);
       throw error;

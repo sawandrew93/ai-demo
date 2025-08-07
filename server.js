@@ -120,10 +120,10 @@ async function searchKnowledgeBase(query, limit = 5) {
     const queryEmbedding = await generateEmbedding(query);
     console.log('✅ Generated embedding, length:', queryEmbedding.length);
 
-    // Search using the knowledge base service with lower threshold for better matching
-    const results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.3, limit);
+    // Search using the knowledge base service with very low threshold to find any relevant content
+    const results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.1, limit);
 
-    console.log(`📊 Found ${results?.length || 0} results with threshold 0.3`);
+    console.log(`📊 Found ${results?.length || 0} results with threshold 0.1`);
     if (results && results.length > 0) {
       console.log('📝 Top result similarity:', results[0].similarity);
       console.log('📝 Top result title:', results[0].title);
