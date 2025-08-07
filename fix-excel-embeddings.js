@@ -10,16 +10,23 @@ async function fixExcelEmbeddings() {
   const knowledgeDB = new KnowledgeBaseDB();
   
   try {
-    // Get all documents without embeddings (likely Excel files)
-    const { data: documentsWithoutEmbeddings, error } = await knowledgeDB.supabase
+    // Get all Excel documents to check their embeddings
+    const { data: allExcelDocs, error } = await knowledgeDB.supabase
       .from('documents')
       .select('*')
-      .or('embedding.is.null,embedding.eq.{}')
       .eq('source_type', 'xlsx');
     
     if (error) {
       throw error;
     }
+    
+    // Filter documents with invalid embeddings
+    const documentsWithoutEmbeddings = allExcelDocs.filter(doc => {
+      return !doc.embedding || 
+             doc.embedding === null || 
+             Array.isArray(doc.embedding) && doc.embedding.length === 0 ||
+             (typeof doc.embedding === 'object' && Object.keys(doc.embedding).length === 0);
+    });
     
     console.log(`📊 Found ${documentsWithoutEmbeddings.length} Excel documents without embeddings`);
     
