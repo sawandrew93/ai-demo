@@ -113,23 +113,14 @@ async function searchKnowledgeBase(query, limit = 5) {
     const queryEmbedding = await generateEmbedding(query);
     console.log('✅ Generated embedding, length:', queryEmbedding.length);
 
-    // Search using the knowledge base service
-    const results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, SIMILARITY_THRESHOLD, limit);
+    // Search using the knowledge base service with lower threshold for better matching
+    const results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.3, limit);
 
-    console.log(`📊 Found ${results?.length || 0} results with threshold ${SIMILARITY_THRESHOLD}`);
+    console.log(`📊 Found ${results?.length || 0} results with threshold 0.3`);
     if (results && results.length > 0) {
       console.log('📝 Top result similarity:', results[0].similarity);
       console.log('📝 Top result title:', results[0].title);
       console.log('📝 Top result content:', results[0].content?.substring(0, 200) + '...');
-    } else {
-      // Try with lower threshold to see what's available
-      const fallbackResults = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.1, 5);
-      console.log('🔍 Fallback results (lower threshold):', fallbackResults?.length || 0);
-      if (fallbackResults && fallbackResults.length > 0) {
-        console.log('📝 Best similarity score:', fallbackResults[0].similarity);
-        console.log('📝 Best result title:', fallbackResults[0].title);
-        console.log('📝 Best result content:', fallbackResults[0].content?.substring(0, 200) + '...');
-      }
     }
 
     return results || [];
