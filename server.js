@@ -48,7 +48,7 @@ const customerIdleTimeouts = new Map();
 const chatHistory = [];
 const agentReconnectTimeouts = new Map();
 
-// Agent users (same as before)
+// Agent users
 const agentUsers = new Map([
   ['agent1', {
     id: 'agent1',
@@ -72,7 +72,7 @@ const agentUsers = new Map([
 
 async function initializeAgentUsers() {
   const users = [
-    { id: 'agent1', username: 'saw.andrew', email: 'andrew.saw@vanguardmm.com', name: 'Saw Andrew', password: 'asd123!@#', role: 'agent' },
+    { id: 'agent1', username: 'saw.andrew', email: 'andrew.saw@vanguardmm.com', name: 'Andrew', password: 'asd123!@#', role: 'agent' },
     { id: 'agent2', username: 'blaze.hein', email: 'blaze.hein@vanguardmm.com', name: 'Blaze', password: 'asd123!@#', role: 'agent' }
   ];
 
@@ -311,7 +311,7 @@ This is not a question, so respond appropriately without needing to check any kn
   }
 }
 
-// ========== UTILITY FUNCTIONS (keeping existing ones) ========== //
+// ========== UTILITY FUNCTIONS ========== //
 function setupCustomerTimeout(sessionId) {
   clearCustomerTimeout(sessionId);
 
