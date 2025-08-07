@@ -97,10 +97,15 @@ class DocumentProcessor {
       workbook.SheetNames.forEach((sheetName) => {
         const worksheet = workbook.Sheets[sheetName];
         const rows = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-        metadata.sheets.push({ name: sheetName, rows: rows.length });
-        rows.forEach((row, rowIndex) => {
-          if (row.length === 0 || row.every(cell => cell === undefined || cell === null || cell === '')) return;
-          const content = row.map((cell, colIdx) => `Col${colIdx + 1}: ${cell}`).join(' | ');
+        if (rows.length < 2) return; // Skip if no data rows
+        const headers = rows[0].map(h => (h !== undefined && h !== null && h !== '') ? String(h) : 'Column');
+        metadata.sheets.push({ name: sheetName, rows: rows.length - 1, headers });
+        for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+          const row = rows[rowIndex];
+          if (!row || row.length === 0 || row.every(cell => cell === undefined || cell === null || cell === '')) continue;
+          // Pair each cell with its header
+          const pairs = headers.map((header, colIdx) => `${header}: ${row[colIdx] !== undefined ? row[colIdx] : ''}`);
+          const content = pairs.join(', ');
           allChunks.push({
             content,
             title: `${sheetName} Row ${rowIndex + 1}`,
@@ -109,7 +114,7 @@ class DocumentProcessor {
             row: rowIndex + 1,
             columns: row
           });
-        });
+        }
       });
       const text = allChunks.map(chunk => chunk.content).join('\n');
       return {
