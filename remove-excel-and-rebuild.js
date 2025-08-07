@@ -242,8 +242,8 @@ async function main() {
     // Step 2: Check if there are any Excel files to re-upload
     console.log('📁 Looking for Excel files to re-upload...');
     
-    // You can add your Excel file path here
-    const excelFilePath = './sample-data.xlsx'; // Update this path
+    // Add your actual Excel file path here
+    const excelFilePath = './your-excel-file.xlsx'; // Update this to your actual file path
     
     try {
       await fs.access(excelFilePath);

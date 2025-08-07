@@ -121,7 +121,7 @@ async function searchKnowledgeBase(query, limit = 5) {
     console.log('✅ Generated embedding, length:', queryEmbedding.length);
 
     // Search using the knowledge base service with very low threshold to find any relevant content
-    const results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.1, limit);
+    const results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.05, limit);
 
     console.log(`📊 Found ${results?.length || 0} results with threshold 0.1`);
     if (results && results.length > 0) {
@@ -257,7 +257,7 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
                       userMessage.toLowerCase().startsWith('are');
 
     let context;
-    if (isQuestion && (knowledgeResults.length === 0 || (knowledgeResults.length > 0 && knowledgeResults[0].similarity < 0.4))) {
+    if (isQuestion && (knowledgeResults.length === 0 || (knowledgeResults.length > 0 && knowledgeResults[0].similarity < 0.5))) {
       // No knowledge found or low similarity - suggest human handoff
       return {
         type: 'handoff_suggestion',
@@ -265,15 +265,16 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
         reason: "No relevant knowledge found for customer question"
       };
     } else if (isQuestion) {
-      // Question with knowledge available
-      context = `You are a helpful customer support assistant. Please answer customer questions using only the information provided from the documents table in the Supabase datastore.
+      // Question with knowledge available - but check if AI can actually answer it
+      context = `You are a helpful customer support assistant. Answer the customer question using ONLY the provided information.
 
 Knowledge base information:
 ${knowledgeResults.map(item => `- ${item.content}`).join('\n')}
 
 Customer question: "${userMessage}"
 
-Answer based ONLY on the knowledge base information above. Be direct and concise.`;
+IMPORTANT: If the information above does not contain a clear answer to the specific question, respond with exactly: "HANDOFF_NEEDED"
+Otherwise, provide a direct and specific answer based only on the information above.`;
     } else {
       // Not a question - reply without checking knowledge base
       context = `You are a helpful customer support assistant. The customer said: "${userMessage}"
@@ -282,7 +283,16 @@ This is not a question, so respond appropriately without needing to check any kn
     }
 
     const result = await model.generateContent(context);
-    const responseText = result.response.text();
+    const responseText = result.response.text().trim();
+
+    // Check if AI indicates it cannot answer
+    if (responseText === 'HANDOFF_NEEDED' || responseText.includes('HANDOFF_NEEDED')) {
+      return {
+        type: 'handoff_suggestion',
+        message: "I don't have the specific information you're looking for. Would you like to connect with human support?",
+        reason: "AI could not provide specific answer from available knowledge"
+      };
+    }
 
     // Determine intent category from knowledge results
     const category = knowledgeResults[0]?.metadata?.category || 'general';
