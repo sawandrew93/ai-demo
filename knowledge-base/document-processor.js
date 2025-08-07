@@ -1,7 +1,7 @@
 // knowledge-base/document-processor.js
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
-const xlsx = require('xlsx');
+
 const fs = require('fs').promises;
 
 class DocumentProcessor {
@@ -83,56 +83,7 @@ class DocumentProcessor {
     }
   }
 
-  async processExcelFile(filePath) {
-    try {
-      console.log(`📄 Processing Excel file: ${filePath}`);
-      
-      const workbook = xlsx.readFile(filePath);
-      const sheetName = workbook.SheetNames[0]; // Use first sheet
-      const sheet = workbook.Sheets[sheetName];
-      
-      // Convert to JSON with proper headers
-      const jsonData = xlsx.utils.sheet_to_json(sheet);
-      console.log(`📊 Found ${jsonData.length} rows in Excel`);
-      
-      // Return individual rows for separate processing
-      const rows = jsonData.map((row, index) => {
-        const rowNumber = index + 2; // Excel row number (header is row 1)
-        
-        // Create comprehensive text for this record
-        const recordText = Object.entries(row)
-          .filter(([key, value]) => value !== null && value !== undefined && value !== '')
-          .map(([key, value]) => `${key}: ${value}`)
-          .join(', ');
-        
-        return {
-          text: `Row ${rowNumber}: ${recordText}`,
-          metadata: {
-            source_type: 'xlsx',
-            filename: filePath.split(/[\\\/]/).pop(),
-            row_number: rowNumber,
-            record_data: row
-          },
-          title: `${filePath.split(/[\\\/]/).pop()} - Row ${rowNumber}`
-        };
-      });
-      
-      console.log(`✅ Processed ${rows.length} individual records`);
-      
-      return {
-        text: '', // Not used for individual rows
-        metadata: {
-          source_type: 'xlsx',
-          filename: filePath.split(/[\\\/]/).pop(),
-          total_rows: rows.length,
-          individual_rows: rows
-        }
-      };
-    } catch (error) {
-      console.error('❌ Error processing Excel file:', error);
-      throw error;
-    }
-  }
+
 
   chunkText(text, title = '') {
     if (!text || text.trim().length === 0) {
@@ -214,10 +165,7 @@ class DocumentProcessor {
         case 'doc':
           result = await this.processWordFile(filePath);
           break;
-        case 'xlsx':
-        case 'xls':
-          result = await this.processExcelFile(filePath);
-          break;
+
         default:
           throw new Error(`Unsupported file type: ${extension} (from path: ${filePath})`);
       }
