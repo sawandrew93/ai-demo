@@ -59,24 +59,55 @@ class KnowledgeBaseDB {
 
   async searchSimilarDocuments(queryEmbedding, threshold = 0.3, limit = 5) {
     try {
-      const { data, error } = await this.supabase.rpc('match_documents', {
-        query_embedding: queryEmbedding,
-        match_threshold: threshold,
-        match_count: limit * 2 // Get more results to ensure we find recent content
-      });
+      // Get all documents and calculate similarity manually to ensure proper sorting
+      const { data: allDocs, error } = await this.supabase
+        .from('documents')
+        .select('id, title, content, metadata, created_at, embedding')
+        .order('created_at', { ascending: false });
 
       if (error) {
         throw error;
       }
 
-      // Sort by created_at descending to prioritize recent documents
-      const sortedResults = (data || []).sort((a, b) => {
-        const dateA = new Date(a.created_at || 0);
-        const dateB = new Date(b.created_at || 0);
-        return dateB - dateA;
+      // Calculate cosine similarity for each document
+      const results = [];
+      for (const doc of allDocs || []) {
+        if (doc.embedding && doc.embedding.length === queryEmbedding.length) {
+          // Calculate cosine similarity
+          let dotProduct = 0;
+          let normA = 0;
+          let normB = 0;
+          
+          for (let i = 0; i < queryEmbedding.length; i++) {
+            dotProduct += queryEmbedding[i] * doc.embedding[i];
+            normA += queryEmbedding[i] * queryEmbedding[i];
+            normB += doc.embedding[i] * doc.embedding[i];
+          }
+          
+          const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+          
+          if (similarity > threshold) {
+            results.push({
+              id: doc.id,
+              title: doc.title,
+              content: doc.content,
+              metadata: doc.metadata,
+              similarity: similarity,
+              created_at: doc.created_at
+            });
+          }
+        }
+      }
+
+      // Sort by similarity descending, then by created_at descending for ties
+      results.sort((a, b) => {
+        if (Math.abs(a.similarity - b.similarity) < 0.01) {
+          return new Date(b.created_at) - new Date(a.created_at);
+        }
+        return b.similarity - a.similarity;
       });
 
-      return sortedResults.slice(0, limit);
+      return results.slice(0, limit);
     } catch (error) {
       console.error('❌ Error searching documents:', error);
       throw error;
