@@ -21,77 +21,94 @@ async function fixExcelTableApproach() {
     if (deleteError) throw deleteError;
     console.log('✅ Old Excel documents removed');
 
-    // 2. Process Excel file properly
-    const excelPath = './Tickets.xlsx'; // Update this path
+    // 2. Get existing Excel documents and reprocess them
+    console.log('📄 Looking for existing Excel documents to reprocess...');
     
-    try {
-      const workbook = xlsx.readFile(excelPath);
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
+    const { data: existingExcel, error: fetchError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('source_type', 'xlsx')
+      .limit(1);
+    
+    if (fetchError) throw fetchError;
+    
+    if (existingExcel.length === 0) {
+      console.log('❌ No Excel documents found in database.');
+      console.log('📋 Please upload your Excel file through the web interface first:');
+      console.log('   1. Go to /knowledge-base');
+      console.log('   2. Login with agent credentials');
+      console.log('   3. Upload your Excel file');
+      console.log('   4. Then run this script');
+      return;
+    }
+    
+    console.log(`📊 Found Excel data to reprocess`);
+    
+    // Get the raw content and try to extract structured data
+    const sampleDoc = existingExcel[0];
+    console.log('📝 Sample content:', sampleDoc.content.substring(0, 200));
+    
+    // Parse the existing content to extract ticket information
+    const content = sampleDoc.content;
+    const ticketMatches = content.match(/Sheet\w*,?\s*Row\s*(\d+):[^.]+/g) || [];
+    
+    console.log(`🎯 Found ${ticketMatches.length} ticket records to reprocess`);
+    
+    for (let i = 0; i < ticketMatches.length; i++) {
+      const ticketMatch = ticketMatches[i];
       
-      // Convert to JSON with proper headers
-      const jsonData = xlsx.utils.sheet_to_json(sheet);
-      console.log(`📊 Found ${jsonData.length} rows in Excel`);
+      // Extract ticket information from the text
+      const ticketIdMatch = ticketMatch.match(/Ticket IDs Sequence:\s*(\d+)/);
+      const assignedToMatch = ticketMatch.match(/Assigned to:\s*([^,]+)/);
+      const customerMatch = ticketMatch.match(/Customer:\s*([^,]+)/);
       
-      // Process each row as a complete record
-      for (let i = 0; i < jsonData.length; i++) {
-        const row = jsonData[i];
-        const rowNumber = i + 2; // Excel row number (header is row 1)
-        
-        // Create comprehensive text for this ticket
-        const ticketText = Object.entries(row)
-          .filter(([key, value]) => value !== null && value !== undefined && value !== '')
-          .map(([key, value]) => `${key}: ${value}`)
-          .join(', ');
-        
-        // Create searchable content with multiple formats
-        const searchableContent = [
-          `Ticket Row ${rowNumber}: ${ticketText}`,
-          `Ticket ID ${row['Ticket IDs Sequence'] || 'unknown'}: ${ticketText}`,
-          ticketText
-        ].join('. ');
-        
-        // Generate embedding
-        const embedding = await embeddingService.generateEmbedding(searchableContent);
-        
-        // Insert as individual ticket record
-        const { error: insertError } = await supabase
-          .from('documents')
-          .insert({
-            title: `Ticket ${row['Ticket IDs Sequence'] || rowNumber}`,
-            content: searchableContent,
-            embedding: embedding,
-            metadata: {
-              source_type: 'xlsx',
-              row_number: rowNumber,
-              ticket_id: row['Ticket IDs Sequence'],
-              assigned_to: row['Assigned to'],
-              customer: row['Customer'],
-              ticket_data: row
-            }
-          });
-        
-        if (insertError) {
-          console.error(`❌ Failed to insert row ${rowNumber}:`, insertError);
-          continue;
-        }
-        
-        console.log(`✅ Inserted Ticket ${row['Ticket IDs Sequence'] || rowNumber}`);
-        
-        // Delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 300));
+      const ticketId = ticketIdMatch ? ticketIdMatch[1] : `unknown_${i}`;
+      const assignedTo = assignedToMatch ? assignedToMatch[1].trim() : 'Unknown';
+      const customer = customerMatch ? customerMatch[1].trim() : 'Unknown';
+      
+      // Create better searchable content
+      const searchableContent = [
+        `Ticket ${ticketId}: ${ticketMatch}`,
+        `Assigned to ${assignedTo}, Ticket ID ${ticketId}`,
+        `Customer ${customer}, Ticket ${ticketId}`,
+        ticketMatch
+      ].join('. ');
+      
+      // Generate embedding
+      const embedding = await embeddingService.generateEmbedding(searchableContent);
+      
+      // Insert as individual ticket record
+      const { error: insertError } = await supabase
+        .from('documents')
+        .insert({
+          title: `Ticket ${ticketId}`,
+          content: searchableContent,
+          embedding: embedding,
+          metadata: {
+            source_type: 'xlsx',
+            ticket_id: ticketId,
+            assigned_to: assignedTo,
+            customer: customer,
+            original_content: ticketMatch
+          }
+        });
+      
+      if (insertError) {
+        console.error(`❌ Failed to insert ticket ${ticketId}:`, insertError);
+        continue;
       }
       
-      console.log('🎉 Excel processing completed!');
+      console.log(`✅ Inserted Ticket ${ticketId} (Assigned: ${assignedTo})`);
       
-      // 3. Test the new approach
-      console.log('\n🧪 Testing new approach...');
-      await testQueries();
-      
-    } catch (fileError) {
-      console.error('❌ Excel file not found. Please update the file path in the script.');
-      console.log('Current path:', excelPath);
+      // Delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
+    
+    console.log('🎉 Excel reprocessing completed!');
+    
+    // 3. Test the new approach
+    console.log('\n🧪 Testing new approach...');
+    await testQueries();
     
   } catch (error) {
     console.error('❌ Process failed:', error);
