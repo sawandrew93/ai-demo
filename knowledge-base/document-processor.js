@@ -94,14 +94,28 @@ class DocumentProcessor {
         const sheet = workbook.Sheets[sheetName];
         const sheetData = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
         
-        // Convert array data to readable text
+        // Get headers from first row
+        const headers = sheetData[0] || [];
+        
+        // Convert array data to more structured readable text
         let sheetText = `Data from sheet ${sheetName}: `;
         
+        // Process each row with headers for better context
         sheetData.forEach((row, rowIndex) => {
+          if (rowIndex === 0) return; // Skip header row
+          
           if (row.some(cell => cell !== '')) { // Skip empty rows
-            const cleanRow = row.map(cell => String(cell).trim()).filter(cell => cell !== '');
-            if (cleanRow.length > 0) {
-              sheetText += cleanRow.join(' ') + '. ';
+            const rowData = [];
+            row.forEach((cell, cellIndex) => {
+              if (cell !== '' && headers[cellIndex]) {
+                rowData.push(`${headers[cellIndex]}: ${String(cell).trim()}`);
+              } else if (cell !== '') {
+                rowData.push(String(cell).trim());
+              }
+            });
+            
+            if (rowData.length > 0) {
+              sheetText += rowData.join(', ') + '. ';
             }
           }
         });
@@ -110,7 +124,7 @@ class DocumentProcessor {
       });
       
       const metadata = {
-        source_type: 'excel',
+        source_type: 'xlsx',
         filename: filePath.split(/[\\\/]/).pop(),
         sheets: workbook.SheetNames.length
       };
