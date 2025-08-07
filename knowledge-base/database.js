@@ -59,17 +59,54 @@ class KnowledgeBaseDB {
 
   async searchSimilarDocuments(queryEmbedding, threshold = 0.1, limit = 5) {
     try {
-      const { data, error } = await this.supabase.rpc('match_documents', {
-        query_embedding: queryEmbedding,
-        match_threshold: threshold,
-        match_count: limit
-      });
+      // Get all documents with embeddings
+      const { data: allDocs, error } = await this.supabase
+        .from('documents')
+        .select('id, title, content, metadata, created_at, embedding')
+        .not('embedding', 'is', null);
 
       if (error) {
         throw error;
       }
 
-      return data || [];
+      const results = [];
+      
+      // Calculate similarity for each document
+      for (const doc of allDocs || []) {
+        if (doc.embedding && Array.isArray(doc.embedding) && doc.embedding.length === queryEmbedding.length) {
+          // Calculate dot product
+          let dotProduct = 0;
+          let normA = 0;
+          let normB = 0;
+          
+          for (let i = 0; i < queryEmbedding.length; i++) {
+            const a = queryEmbedding[i];
+            const b = doc.embedding[i];
+            dotProduct += a * b;
+            normA += a * a;
+            normB += b * b;
+          }
+          
+          // Calculate cosine similarity
+          const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+          
+          if (similarity >= threshold) {
+            results.push({
+              id: doc.id,
+              title: doc.title,
+              content: doc.content,
+              metadata: doc.metadata,
+              similarity: similarity,
+              created_at: doc.created_at
+            });
+          }
+        }
+      }
+
+      // Sort by similarity descending
+      results.sort((a, b) => b.similarity - a.similarity);
+      
+      return results.slice(0, limit);
     } catch (error) {
       console.error('❌ Error searching documents:', error);
       throw error;
