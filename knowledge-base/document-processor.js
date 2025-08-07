@@ -88,48 +88,71 @@ class DocumentProcessor {
       console.log(`📄 Processing Excel file: ${filePath}`);
       
       const workbook = xlsx.readFile(filePath);
-      let text = '';
+      const allRows = [];
       
       workbook.SheetNames.forEach(sheetName => {
+        console.log(`  📋 Processing sheet: ${sheetName}`);
+        
         const sheet = workbook.Sheets[sheetName];
-        const sheetData = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        const jsonData = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
         
+        if (jsonData.length === 0) {
+          console.log(`    ⚠️ Sheet ${sheetName} is empty, skipping`);
+          return;
+        }
+
         // Get headers from first row
-        const headers = sheetData[0] || [];
-        
-        // Convert array data to more structured readable text
-        let sheetText = `Data from sheet ${sheetName}: `;
-        
-        // Process each row with headers for better context
-        sheetData.forEach((row, rowIndex) => {
-          if (rowIndex === 0) return; // Skip header row
-          
-          if (row.some(cell => cell !== '')) { // Skip empty rows
-            const rowData = [];
-            row.forEach((cell, cellIndex) => {
-              if (cell !== '' && headers[cellIndex]) {
-                rowData.push(`${headers[cellIndex]}: ${String(cell).trim()}`);
-              } else if (cell !== '') {
-                rowData.push(String(cell).trim());
+        const headers = jsonData[0] || [];
+        console.log(`    📝 Headers: ${headers.join(', ')}`);
+
+        // Process each data row
+        const dataRows = jsonData.slice(1).filter(row => 
+          row.some(cell => cell !== null && cell !== undefined && cell !== '')
+        );
+
+        console.log(`    📊 Processing ${dataRows.length} data rows`);
+
+        dataRows.forEach((row, rowIndex) => {
+          const textParts = [];
+          const structuredData = {};
+
+          // Create structured data and readable text
+          headers.forEach((header, colIndex) => {
+            const cellValue = row[colIndex];
+            if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
+              const cleanHeader = String(header).trim();
+              const cleanValue = String(cellValue).trim();
+              
+              if (cleanHeader && cleanValue) {
+                structuredData[cleanHeader] = cleanValue;
+                textParts.push(`${cleanHeader}: ${cleanValue}`);
               }
-            });
-            
-            if (rowData.length > 0) {
-              sheetText += rowData.join(', ') + '. ';
             }
+          });
+
+          if (textParts.length > 0) {
+            allRows.push({
+              sheet: sheetName,
+              row: rowIndex + 2, // +2 because we skipped header and array is 0-indexed
+              text: `Sheet ${sheetName}, Row ${rowIndex + 2}: ${textParts.join(', ')}`,
+              data: structuredData
+            });
           }
         });
-        
-        text += sheetText + ' ';
       });
+      
+      // Combine all rows into searchable text
+      const text = allRows.map(row => row.text).join('. ');
       
       const metadata = {
         source_type: 'xlsx',
         filename: filePath.split(/[\\\/]/).pop(),
-        sheets: workbook.SheetNames.length
+        sheets: workbook.SheetNames,
+        total_rows: allRows.length,
+        structured_data: allRows.map(row => row.data)
       };
 
-      console.log(`✅ Extracted ${text.length} characters from ${workbook.SheetNames.length} sheets`);
+      console.log(`✅ Extracted ${text.length} characters from ${allRows.length} rows across ${workbook.SheetNames.length} sheets`);
       console.log(`📝 Sample content: ${text.substring(0, 200)}...`);
       
       return {
