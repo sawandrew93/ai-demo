@@ -54,7 +54,7 @@ const agentUsers = new Map([
     id: 'agent1',
     username: 'saw.andrew',
     email: 'john@company.com',
-    name: 'John Doe',
+    name: 'Saw Andrew',
     password: '$2b$10$example_hash_here',
     role: 'agent',
     isActive: true
@@ -72,7 +72,7 @@ const agentUsers = new Map([
 
 async function initializeAgentUsers() {
   const users = [
-    { id: 'agent1', username: 'saw.andrew', email: 'john@company.com', name: 'John Doe', password: 'asd123!@#', role: 'agent' },
+    { id: 'agent1', username: 'saw.andrew', email: 'john@company.com', name: 'Saw Andrew', password: 'asd123!@#', role: 'agent' },
     { id: 'agent2', username: 'jane_smith', email: 'jane@company.com', name: 'Jane Smith', password: 'password456', role: 'senior_agent' }
   ];
 
