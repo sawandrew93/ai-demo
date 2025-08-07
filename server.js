@@ -1345,13 +1345,14 @@ const kbUpload = multer({
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
       'application/msword', // .doc
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'application/vnd.ms-excel' // .xls
+      'application/vnd.ms-excel', // .xls
+      'text/plain' // .txt
     ];
     
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only PDF, Word, and Excel files are allowed'));
+      cb(new Error('Only PDF, Word, Excel, and text files are allowed'));
     }
   }
 });

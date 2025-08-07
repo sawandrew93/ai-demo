@@ -106,14 +106,14 @@ class KnowledgeBaseDB {
         throw error;
       }
 
-      // Group by filename and show summary
+      // Group by title and show summary
       const grouped = {};
       data.forEach(doc => {
-        const filename = doc.metadata?.filename || doc.title;
-        if (!grouped[filename]) {
-          grouped[filename] = {
+        const groupKey = doc.title;
+        if (!grouped[groupKey]) {
+          grouped[groupKey] = {
             id: doc.id,
-            title: filename,
+            title: doc.title,
             content: doc.content.substring(0, 200) + '...',
             metadata: {
               ...doc.metadata,
@@ -125,9 +125,9 @@ class KnowledgeBaseDB {
             chunks: []
           };
         }
-        grouped[filename].chunks.push(doc);
-        grouped[filename].metadata.total_chunks++;
-        grouped[filename].metadata.total_characters += doc.content.length;
+        grouped[groupKey].chunks.push(doc);
+        grouped[groupKey].metadata.total_chunks++;
+        grouped[groupKey].metadata.total_characters += doc.content.length;
       });
 
       return Object.values(grouped).slice(0, limit);
@@ -137,18 +137,18 @@ class KnowledgeBaseDB {
     }
   }
 
-  async deleteDocumentGroup(filename) {
+  async deleteDocumentGroup(title) {
     try {
       const { error } = await this.supabase
         .from('documents')
         .delete()
-        .eq('metadata->>filename', filename);
+        .eq('title', title);
 
       if (error) {
         throw error;
       }
 
-      console.log(`✅ Deleted all chunks for: ${filename}`);
+      console.log(`✅ Deleted all chunks for: ${title}`);
       return true;
     } catch (error) {
       console.error('❌ Error deleting document group:', error);
