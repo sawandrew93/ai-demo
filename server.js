@@ -119,13 +119,16 @@ async function searchKnowledgeBase(query, limit = 5) {
     console.log(`📊 Found ${results?.length || 0} results with threshold ${SIMILARITY_THRESHOLD}`);
     if (results && results.length > 0) {
       console.log('📝 Top result similarity:', results[0].similarity);
-      console.log('📝 Top result:', results[0].content?.substring(0, 100) + '...');
+      console.log('📝 Top result title:', results[0].title);
+      console.log('📝 Top result content:', results[0].content?.substring(0, 200) + '...');
     } else {
       // Try with lower threshold to see what's available
-      const fallbackResults = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.1, 3);
+      const fallbackResults = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.1, 5);
       console.log('🔍 Fallback results (lower threshold):', fallbackResults?.length || 0);
       if (fallbackResults && fallbackResults.length > 0) {
         console.log('📝 Best similarity score:', fallbackResults[0].similarity);
+        console.log('📝 Best result title:', fallbackResults[0].title);
+        console.log('📝 Best result content:', fallbackResults[0].content?.substring(0, 200) + '...');
       }
     }
 
@@ -1447,15 +1450,9 @@ app.get('/api/knowledge-base/documents', verifyToken, async (req, res) => {
 // Delete document
 app.delete('/api/knowledge-base/documents/:id', verifyToken, async (req, res) => {
   try {
-    const filename = req.params.id;
-    if (filename.includes('.')) {
-      // Delete entire document group by filename
-      await knowledgeDB.deleteDocumentGroup(filename);
-    } else {
-      // Delete single chunk by ID
-      const id = parseInt(filename);
-      await knowledgeDB.deleteDocument(id);
-    }
+    const titleOrId = req.params.id;
+    // Always delete by title (document group) since we're showing grouped documents
+    await knowledgeDB.deleteDocumentGroup(titleOrId);
     res.json({ success: true });
   } catch (error) {
     console.error('Delete document error:', error);

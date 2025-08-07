@@ -620,7 +620,7 @@
                         <div class="document-content">${doc.content.substring(0, 150)}...</div>
                         <div class="document-meta">
                             <span>${doc.metadata?.source_type || 'manual'}</span>
-                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteDocument(${doc.id})">
+                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteDocument('${doc.title}')">
                                 🗑️ Delete
                             </button>
                         </div>
