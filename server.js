@@ -1310,7 +1310,8 @@ const kbUpload = multer({
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
       'application/msword', // .doc
-      'text/plain' // .txt
+      'text/plain', // .txt
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // .xlsx
     ];
     
     if (allowedTypes.includes(file.mimetype)) {

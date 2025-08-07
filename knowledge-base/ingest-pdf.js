@@ -45,15 +45,22 @@ class PDFIngestionService {
           const docTitle = title || chunk.title || result.metadata.filename.replace(/\.[^/.]+$/, '');
           console.log(`📝 Inserting chunk with title: ${docTitle}`);
           console.log(`📄 Chunk content preview: ${chunk.content.substring(0, 100)}...`);
+          let chunkMetadata = {
+            ...result.metadata,
+            chunk_index: i,
+            total_chunks: result.chunks.length,
+            chunk_length: chunk.length
+          };
+          // For Excel, add sheet/row/columns info
+          if (result.metadata.source_type === 'excel') {
+            chunkMetadata.sheet = chunk.sheet;
+            chunkMetadata.row = chunk.row;
+            chunkMetadata.columns = chunk.columns;
+          }
           documents.push({
             title: docTitle,
             content: chunk.content,
-            metadata: {
-              ...result.metadata,
-              chunk_index: i,
-              total_chunks: result.chunks.length,
-              chunk_length: chunk.length
-            },
+            metadata: chunkMetadata,
             embedding: embeddingResult.embedding,
             source_type: fileType || result.metadata.source_type,
             source_url: filePath

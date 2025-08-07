@@ -1,6 +1,7 @@
 // knowledge-base/document-processor.js
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
+const xlsx = require('xlsx');
 
 const fs = require('fs').promises;
 
@@ -83,6 +84,44 @@ class DocumentProcessor {
     }
   }
 
+  async processExcelFile(filePath) {
+    try {
+      console.log(`📄 Processing Excel file: ${filePath}`);
+      const workbook = xlsx.readFile(filePath);
+      const allChunks = [];
+      const metadata = {
+        source_type: 'excel',
+        filename: filePath.split(/[\\\/]/).pop(),
+        sheets: []
+      };
+      workbook.SheetNames.forEach((sheetName) => {
+        const worksheet = workbook.Sheets[sheetName];
+        const rows = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+        metadata.sheets.push({ name: sheetName, rows: rows.length });
+        rows.forEach((row, rowIndex) => {
+          if (row.length === 0 || row.every(cell => cell === undefined || cell === null || cell === '')) return;
+          const content = row.map((cell, colIdx) => `Col${colIdx + 1}: ${cell}`).join(' | ');
+          allChunks.push({
+            content,
+            title: `${sheetName} Row ${rowIndex + 1}`,
+            length: content.length,
+            sheet: sheetName,
+            row: rowIndex + 1,
+            columns: row
+          });
+        });
+      });
+      const text = allChunks.map(chunk => chunk.content).join('\n');
+      return {
+        text,
+        metadata,
+        chunks: allChunks
+      };
+    } catch (error) {
+      console.error('❌ Error processing Excel file:', error);
+      throw error;
+    }
+  }
 
 
   chunkText(text, title = '') {
@@ -165,22 +204,28 @@ class DocumentProcessor {
         case 'doc':
           result = await this.processWordFile(filePath);
           break;
-
+        case 'xlsx':
+          result = await this.processExcelFile(filePath);
+          break;
         default:
           throw new Error(`Unsupported file type: ${extension} (from path: ${filePath})`);
       }
 
-      // Clean the extracted text
-      const cleanedText = this.cleanText(result.text);
-      
-      // Create chunks with the provided title
-      const documentTitle = title || result.metadata.filename.replace(/\.[^/.]+$/, '');
-      const chunks = this.chunkText(cleanedText, documentTitle);
-      
+      // For Excel, use the already chunked rows
+      let chunks;
+      if (extension === 'xlsx' && result.chunks) {
+        chunks = result.chunks;
+      } else {
+        // Clean the extracted text
+        const cleanedText = this.cleanText(result.text);
+        // Create chunks with the provided title
+        const documentTitle = title || result.metadata.filename.replace(/\.[^/.]+$/, '');
+        chunks = this.chunkText(cleanedText, documentTitle);
+      }
       return {
         chunks: chunks,
         metadata: result.metadata,
-        originalText: cleanedText
+        originalText: result.text
       };
     } catch (error) {
       console.error('❌ Error processing document:', error);
