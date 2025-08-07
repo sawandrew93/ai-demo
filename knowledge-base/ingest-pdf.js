@@ -13,6 +13,82 @@ class PDFIngestionService {
     this.db = new KnowledgeBaseDB();
   }
 
+  async ingestDocument(filePath, title = '', fileType = null) {
+    try {
+      console.log(`🚀 Starting document ingestion: ${filePath}`);
+      
+      // Check if file exists
+      try {
+        await fs.access(filePath);
+      } catch (error) {
+        throw new Error(`File not found: ${filePath}`);
+      }
+
+      // Process the document using the generic processor
+      const result = await this.processor.processDocument(filePath, title, fileType);
+      
+      console.log(`📝 Processing ${result.chunks.length} chunks...`);
+      
+      // Generate embeddings for all chunks
+      const embeddings = await this.embeddingService.generateBatchEmbeddings(
+        result.chunks.map(chunk => chunk.content)
+      );
+
+      // Prepare documents for insertion
+      const documents = [];
+      for (let i = 0; i < result.chunks.length; i++) {
+        const chunk = result.chunks[i];
+        const embeddingResult = embeddings[i];
+        
+        if (embeddingResult.success) {
+          documents.push({
+            title: title || chunk.title || result.metadata.filename.replace(/\.[^/.]+$/, ''),
+            content: chunk.content,
+            metadata: {
+              ...result.metadata,
+              chunk_index: i,
+              total_chunks: result.chunks.length,
+              chunk_length: chunk.length
+            },
+            embedding: embeddingResult.embedding,
+            source_type: fileType || result.metadata.source_type,
+            source_url: filePath
+          });
+        } else {
+          console.warn(`⚠️ Skipping chunk ${i} due to embedding error: ${embeddingResult.error}`);
+        }
+      }
+
+      // Insert documents into database
+      if (documents.length > 0) {
+        const insertedDocs = await this.db.insertBulkDocuments(documents);
+        
+        console.log(`🎉 Successfully ingested document!`);
+        console.log(`📊 Stats:`);
+        console.log(`   - File: ${result.metadata.filename}`);
+        console.log(`   - Type: ${fileType || result.metadata.source_type}`);
+        console.log(`   - Chunks created: ${result.chunks.length}`);
+        console.log(`   - Chunks inserted: ${insertedDocs.length}`);
+        console.log(`   - Total characters: ${result.originalText.length}`);
+        
+        return {
+          success: true,
+          filename: result.metadata.filename,
+          chunksCreated: result.chunks.length,
+          chunksInserted: insertedDocs.length,
+          totalCharacters: result.originalText.length,
+          insertedIds: insertedDocs.map(doc => doc.id)
+        };
+      } else {
+        throw new Error('No valid chunks could be processed');
+      }
+      
+    } catch (error) {
+      console.error('❌ Document ingestion failed:', error);
+      throw error;
+    }
+  }
+
   async ingestPDF(filePath, title = '') {
     try {
       console.log(`🚀 Starting PDF ingestion: ${filePath}`);

@@ -1397,7 +1397,7 @@ app.post('/api/knowledge-base/upload', verifyToken, kbUpload.array('documents', 
         const fileExt = file.originalname.split('.').pop().toLowerCase();
         const cleanTitle = title || file.originalname.replace(/\.[^/.]+$/, '');
         
-        const result = await pdfIngestionService.ingestPDF(file.path, cleanTitle);
+        const result = await pdfIngestionService.ingestDocument(file.path, cleanTitle, fileExt);
         results.push({ filename: file.originalname, ...result });
         if (result.success) successCount++;
         
