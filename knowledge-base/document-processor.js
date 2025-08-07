@@ -100,6 +100,7 @@ class DocumentProcessor {
         if (rows.length < 2) return; // Skip if no data rows
         const headers = rows[0].map(h => (h !== undefined && h !== null && h !== '') ? String(h) : 'Column');
         metadata.sheets.push({ name: sheetName, rows: rows.length - 1, headers });
+        let sheetTextRows = [headers.join(', ')];
         for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
           const row = rows[rowIndex];
           if (!row || row.length === 0 || row.every(cell => cell === undefined || cell === null || cell === '')) continue;
@@ -114,7 +115,20 @@ class DocumentProcessor {
             row: rowIndex + 1,
             columns: row
           });
+          // For full sheet text
+          sheetTextRows.push(row.map(cell => cell !== undefined ? cell : '').join(', '));
         }
+        // Add full sheet as a single chunk
+        const fullSheetText = sheetTextRows.join('\n');
+        allChunks.push({
+          content: fullSheetText,
+          title: `${sheetName} (Full Sheet)`,
+          length: fullSheetText.length,
+          sheet: sheetName,
+          row: null,
+          columns: null,
+          isFullSheet: true
+        });
       });
       const text = allChunks.map(chunk => chunk.content).join('\n');
       return {
