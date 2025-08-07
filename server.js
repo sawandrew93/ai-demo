@@ -107,32 +107,11 @@ async function generateEmbedding(text) {
 
 async function searchKnowledgeBase(query, limit = 5) {
   try {
-    console.log('🔍 Searching knowledge base for:', query);
-    
-    // First, let's see what documents are actually in the database
-    const allDocs = await knowledgeDB.getAllDocuments(10);
-    console.log('📁 Available documents in database:');
-    allDocs.forEach(doc => {
-      console.log(`  - Title: "${doc.title}", Source: ${doc.source_type}, Content preview: ${doc.content?.substring(0, 50)}...`);
-    });
-    
-    // Generate embedding for the query
     const queryEmbedding = await generateEmbedding(query);
-    console.log('✅ Generated embedding, length:', queryEmbedding.length);
-
-    // Search using the knowledge base service with very low threshold to find any relevant content
     const results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.05, limit);
-
-    console.log(`📊 Found ${results?.length || 0} results with threshold 0.1`);
-    if (results && results.length > 0) {
-      console.log('📝 Top result similarity:', results[0].similarity);
-      console.log('📝 Top result title:', results[0].title);
-      console.log('📝 Top result content:', results[0].content?.substring(0, 200) + '...');
-    }
-
     return results || [];
   } catch (error) {
-    console.error('❌ Knowledge base search error:', error);
+    console.error('Knowledge base search error:', error);
     return [];
   }
 }
@@ -846,29 +825,10 @@ function handleAcceptRequest(sessionId, agentId) {
 }
 
 function handleAgentMessage(sessionId, message, messageType = 'text') {
-  console.log(`\n=== AGENT MESSAGE DEBUG ===`);
-  console.log(`Session ID: ${sessionId}`);
-  console.log(`Message: ${message}`);
-  
   const conversation = conversations.get(sessionId);
-  if (!conversation) {
-    console.log('❌ Cannot send agent message - conversation not found');
-    console.log(`Available conversations: ${Array.from(conversations.keys()).join(', ')}`);
+  if (!conversation || !conversation.customerWs) {
     return;
   }
-  
-  console.log(`✅ Conversation found`);
-  console.log(`Has human: ${conversation.hasHuman}`);
-  console.log(`Assigned agent: ${conversation.assignedAgent}`);
-  console.log(`Agent name: ${conversation.agentName}`);
-
-  if (!conversation.customerWs) {
-    console.log('❌ Cannot send agent message - customer not connected');
-    return;
-  }
-  
-  console.log(`✅ Customer WebSocket exists`);
-  console.log(`Customer WebSocket state: ${conversation.customerWs.readyState}`);
 
   conversation.messages.push({
     role: 'agent',
@@ -884,11 +844,7 @@ function handleAgentMessage(sessionId, message, messageType = 'text') {
       messageType,
       timestamp: new Date()
     }));
-    console.log(`✅ Agent message sent successfully to customer`);
-  } else {
-    console.log(`❌ Customer WebSocket not open (state: ${conversation.customerWs.readyState})`);
   }
-  console.log(`=== END DEBUG ===\n`);
 }
 
 function handleEndChat(sessionId, endReason = 'agent_ended') {
@@ -1051,7 +1007,6 @@ async function handleHumanRequest(sessionId, customerInfo = null) {
 // ========== ENHANCED MESSAGE HANDLING ========== //
 async function handleWebSocketMessage(ws, data) {
   try {
-    console.log('Received message:', data.type);
 
     switch(data.type) {
       case 'customer_message':
@@ -1061,15 +1016,15 @@ async function handleWebSocketMessage(ws, data) {
         handleAgentJoin(ws, data);
         break;
       case 'agent_message':
-        console.log(`Received agent_message for session ${data.sessionId}`);
+
         handleAgentMessage(data.sessionId, data.message);
         break;
       case 'request_human':
-        console.log('🔍 Received request_human message:', data);
+
         await handleHumanRequest(data.sessionId, data.customerInfo);
         break;
       case 'accept_request':
-        console.log(`Agent ${data.agentId} accepting request ${data.sessionId}`);
+
         handleAcceptRequest(data.sessionId, data.agentId);
         break;
       case 'end_chat':
@@ -1177,7 +1132,7 @@ async function handleWebSocketMessage(ws, data) {
         }
         break;
       default:
-        console.log('Unknown message type:', data.type);
+
     }
   } catch (error) {
     console.error('Message handling error:', error);
@@ -1186,19 +1141,19 @@ async function handleWebSocketMessage(ws, data) {
 
 // ========== WEBSOCKET SETUP ========== //
 wss.on('connection', (ws) => {
-  console.log('New WebSocket connection');
+
 
   ws.on('message', async (message) => {
     try {
       const data = JSON.parse(message);
       await handleWebSocketMessage(ws, data);
     } catch (error) {
-      console.error('Message parse error:', error);
+
     }
   });
 
   ws.on('close', () => {
-    console.log('WebSocket connection closed');
+  
 
     // Clean up disconnected agents
     for (const [agentId, agentData] of humanAgents) {
@@ -1535,7 +1490,7 @@ app.get('/files', (req, res) => {
 app.get('/test-kb', async (req, res) => {
   try {
     const query = req.query.q || 'pricing';
-    console.log('Testing knowledge base with query:', query);
+
     
     // Test direct database query first
     const { data: allDocs, error: countError } = await supabase
@@ -1547,7 +1502,7 @@ app.get('/test-kb', async (req, res) => {
       return res.json({ error: 'Database connection failed', details: countError });
     }
     
-    console.log(`Found ${allDocs?.length || 0} total documents in database`);
+
     
     // Test embedding search
     const results = await searchKnowledgeBase(query, 3);
@@ -1560,8 +1515,8 @@ app.get('/test-kb', async (req, res) => {
       match_count: 3
     });
     
-    console.log('Direct function test:', directResults?.length || 0, 'results');
-    if (directError) console.log('Direct function error:', directError);
+
+
     
     res.json({
       query,
