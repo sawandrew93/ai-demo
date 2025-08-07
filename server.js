@@ -53,7 +53,7 @@ const agentUsers = new Map([
   ['agent1', {
     id: 'agent1',
     username: 'saw.andrew',
-    email: 'john@company.com',
+    email: 'andrew.saw@vanguardmm.com',
     name: 'Saw Andrew',
     password: '$2b$10$example_hash_here',
     role: 'agent',
@@ -61,19 +61,19 @@ const agentUsers = new Map([
   }],
   ['agent2', {
     id: 'agent2',
-    username: 'jane_smith',
-    email: 'jane@company.com',
-    name: 'Jane Smith',
+    username: 'blaze.hein',
+    email: 'blaze.hein@vanguardmm.com',
+    name: 'Blaze',
     password: '$2b$10$example_hash_here2',
-    role: 'senior_agent',
+    role: 'agent',
     isActive: true
   }]
 ]);
 
 async function initializeAgentUsers() {
   const users = [
-    { id: 'agent1', username: 'saw.andrew', email: 'john@company.com', name: 'Saw Andrew', password: 'asd123!@#', role: 'agent' },
-    { id: 'agent2', username: 'jane_smith', email: 'jane@company.com', name: 'Jane Smith', password: 'password456', role: 'senior_agent' }
+    { id: 'agent1', username: 'saw.andrew', email: 'andrew.saw@vanguardmm.com', name: 'Saw Andrew', password: 'asd123!@#', role: 'agent' },
+    { id: 'agent2', username: 'blaze.hein', email: 'blaze.hein@vanguardmm.com', name: 'Blaze', password: 'asd123!@#', role: 'agent' }
   ];
 
   for (const user of users) {
