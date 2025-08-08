@@ -222,6 +222,20 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
+    // Handle explicit human support requests
+    const humanRequestKeywords = ['talk with support', 'talk with human', 'speak with agent', 'connect with human', 'human support', 'live agent', 'real person'];
+    const isHumanRequest = humanRequestKeywords.some(keyword => 
+      userMessage.toLowerCase().includes(keyword)
+    );
+
+    if (isHumanRequest) {
+      return {
+        type: 'handoff_suggestion',
+        message: "Sure! I'll connect you with one of our support agents right away.",
+        reason: "Customer explicitly requested human support"
+      };
+    }
+
     // Check if it's a question
     const isQuestion = userMessage.includes('?') || 
                       userMessage.toLowerCase().startsWith('what') ||

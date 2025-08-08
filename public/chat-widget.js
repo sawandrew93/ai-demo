@@ -1043,6 +1043,7 @@
         }));
       }
 
+      // Only show connecting message if user accepted
       if (accepted) {
         this.addMessage('Connecting you to a sales representative...', 'system');
       }
