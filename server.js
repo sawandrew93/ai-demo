@@ -275,12 +275,14 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     const relevanceCheck = `Does the following knowledge base information contain a direct answer to the question: "${userMessage}"?
 
 Knowledge base information:
-${knowledgeResults.map(item => `- ${item.content.substring(0, 200)}`).join('\n')}
+${knowledgeResults.map(item => `- ${item.content.substring(0, 400)}`).join('\n')}
 
-Respond with only "YES" if the information directly answers the question, or "NO" if it doesn't contain the specific information needed.`;
+Respond with only "YES" if the information contains relevant details to answer the question, or "NO" if it's completely unrelated.`;
 
     const relevanceResult = await model.generateContent(relevanceCheck);
     const isRelevant = relevanceResult.response.text().trim().toUpperCase().includes('YES');
+    
+    console.log(`🔍 Relevance check for "${userMessage}": ${isRelevant ? 'RELEVANT' : 'NOT RELEVANT'}`);
 
     if (!isRelevant) {
       return {
