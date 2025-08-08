@@ -92,7 +92,7 @@ const CUSTOMER_IDLE_WARNING = 10 * 60 * 1000; // 10 minutes for idle warning
 const CUSTOMER_IDLE_TIMEOUT = (10 * 60 * 1000) + (30 * 1000); // 10 minutes + 30 seconds total
 const AGENT_RECONNECT_WINDOW = 5 * 60 * 1000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
-const SIMILARITY_THRESHOLD = 0.3; // Minimum similarity for knowledge base answers
+const SIMILARITY_THRESHOLD = 0.4; // Minimum similarity for knowledge base answers
 const HANDOFF_THRESHOLD = 0.8; // Threshold for intelligent handoff detection
 
 // ========== VECTOR DATABASE FUNCTIONS ========== //
@@ -274,26 +274,8 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
-    // Check if knowledge base content can actually answer the question
-    const relevanceCheck = `Does the following knowledge base information contain a direct answer to the question: "${userMessage}"?
-
-Knowledge base information:
-${knowledgeResults.map(item => `- ${item.content.substring(0, 400)}`).join('\n')}
-
-Respond with only "YES" if the information contains relevant details to answer the question, or "NO" if it's completely unrelated.`;
-
-    const relevanceResult = await model.generateContent(relevanceCheck);
-    const isRelevant = relevanceResult.response.text().trim().toUpperCase().includes('YES');
-    
-    console.log(`🔍 Relevance check for "${userMessage}": ${isRelevant ? 'RELEVANT' : 'NOT RELEVANT'}`);
-
-    if (!isRelevant) {
-      return {
-        type: 'handoff_suggestion',
-        message: "I don't have specific information about that topic in my knowledge base. Would you like to connect with human support?",
-        reason: "Knowledge base content not relevant to question"
-      };
-    }
+    // Skip relevance check - if we found results with decent similarity, use them
+    console.log(`📋 Using knowledge base results for: "${userMessage}"`);
 
     // Generate response using ONLY knowledge base information
     const context = `You are a helpful assistant. Answer the customer's question using ONLY the information provided below. Do not add any information that is not explicitly stated in the knowledge base.
