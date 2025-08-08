@@ -638,7 +638,10 @@
             }
 
             try {
-                const response = await makeAuthenticatedRequest(`/api/knowledge-base/documents/${id}`, {
+                const encodedId = encodeURIComponent(id);
+                console.log('Deleting document with ID:', id, 'Encoded:', encodedId);
+                
+                const response = await makeAuthenticatedRequest(`/api/knowledge-base/documents/${encodedId}`, {
                     method: 'DELETE'
                 });
                 

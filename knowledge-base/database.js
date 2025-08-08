@@ -139,16 +139,36 @@ class KnowledgeBaseDB {
 
   async deleteDocumentGroup(title) {
     try {
-      const { error } = await this.supabase
+      console.log(`🗑️ Attempting to delete document group: "${title}"`);
+      
+      // First check if documents exist with this title
+      const { data: existingDocs, error: checkError } = await this.supabase
+        .from('documents')
+        .select('id, title')
+        .eq('title', title);
+      
+      if (checkError) {
+        throw checkError;
+      }
+      
+      console.log(`📊 Found ${existingDocs?.length || 0} documents with title: "${title}"`);
+      
+      if (!existingDocs || existingDocs.length === 0) {
+        console.log(`⚠️ No documents found with title: "${title}"`);
+        return false;
+      }
+      
+      const { data, error } = await this.supabase
         .from('documents')
         .delete()
-        .eq('title', title);
+        .eq('title', title)
+        .select();
 
       if (error) {
         throw error;
       }
 
-      console.log(`✅ Deleted all chunks for: ${title}`);
+      console.log(`✅ Deleted ${data?.length || 0} chunks for: "${title}"`);
       return true;
     } catch (error) {
       console.error('❌ Error deleting document group:', error);
