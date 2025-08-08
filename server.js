@@ -257,6 +257,25 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
+    // Check if knowledge base content can actually answer the question
+    const relevanceCheck = `Does the following knowledge base information contain a direct answer to the question: "${userMessage}"?
+
+Knowledge base information:
+${knowledgeResults.map(item => `- ${item.content.substring(0, 200)}`).join('\n')}
+
+Respond with only "YES" if the information directly answers the question, or "NO" if it doesn't contain the specific information needed.`;
+
+    const relevanceResult = await model.generateContent(relevanceCheck);
+    const isRelevant = relevanceResult.response.text().trim().toUpperCase().includes('YES');
+
+    if (!isRelevant) {
+      return {
+        type: 'handoff_suggestion',
+        message: "I don't have specific information about that topic in my knowledge base. Would you like to connect with human support?",
+        reason: "Knowledge base content not relevant to question"
+      };
+    }
+
     // Generate response using ONLY knowledge base information
     const context = `You are a helpful assistant. Answer the customer's question using ONLY the information provided below. Do not add any information that is not explicitly stated in the knowledge base.
 
