@@ -92,7 +92,7 @@ const CUSTOMER_IDLE_WARNING = 10 * 60 * 1000; // 10 minutes for idle warning
 const CUSTOMER_IDLE_TIMEOUT = (10 * 60 * 1000) + (30 * 1000); // 10 minutes + 30 seconds total
 const AGENT_RECONNECT_WINDOW = 5 * 60 * 1000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
-const SIMILARITY_THRESHOLD = 0.5; // Minimum similarity for knowledge base answers
+const SIMILARITY_THRESHOLD = 0.3; // Minimum similarity for knowledge base answers
 const HANDOFF_THRESHOLD = 0.8; // Threshold for intelligent handoff detection
 
 // ========== VECTOR DATABASE FUNCTIONS ========== //
@@ -261,6 +261,9 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     // For questions, search knowledge base
     const knowledgeResults = await searchKnowledgeBase(userMessage);
     console.log(`📊 Knowledge search results: ${knowledgeResults.length} found`);
+    if (knowledgeResults.length > 0) {
+      console.log(`📝 Top result preview: ${knowledgeResults[0].content.substring(0, 150)}...`);
+    }
 
     // If no knowledge found for question, suggest human handoff
     if (knowledgeResults.length === 0) {
