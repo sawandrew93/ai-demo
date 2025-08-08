@@ -620,7 +620,7 @@
                                 <span><strong>Characters:</strong> ${doc.metadata?.total_characters || 0}</span>
                                 ${doc.originalFilename ? `<span><strong>File:</strong> ${doc.originalFilename}</span>` : ''}
                             </div>
-                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteDocument('${doc.groupKey.replace(/'/g, '\\\'')}', '${doc.title.replace(/'/g, '\\\'')}')">🗑️ Delete All</button>
+                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteDocument('${doc.groupKey}', '${doc.title}')">🗑️ Delete</button>
                         </div>
                     </div>
                 `).join('');
@@ -631,8 +631,7 @@
 
         // Delete document group (all chunks)
         function deleteDocument(groupKey, title) {
-            const displayName = title || groupKey;
-            if (!confirm(`Delete ALL chunks of "${displayName}"?`)) return;
+            if (!confirm(`Delete "${title}"?`)) return;
 
             fetch(`/api/knowledge-base/documents/${encodeURIComponent(groupKey)}`, {
                 method: 'DELETE',
@@ -640,12 +639,8 @@
             })
             .then(r => r.json())
             .then(result => {
-                if (result.success) {
-                    showStatus('manageStatus', `Deleted ${result.deletedCount || 1} chunks`, 'success');
-                    loadDocuments();
-                } else {
-                    showStatus('manageStatus', 'Delete failed', 'error');
-                }
+                showStatus('manageStatus', `Deleted ${result.deletedCount || 0} chunks`, 'success');
+                loadDocuments();
             })
             .catch(() => showStatus('manageStatus', 'Delete failed', 'error'));
         }

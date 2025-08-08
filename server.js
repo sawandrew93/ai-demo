@@ -1447,22 +1447,17 @@ app.get('/api/knowledge-base/documents', verifyToken, async (req, res) => {
 // Delete document
 app.delete('/api/knowledge-base/documents/:id', verifyToken, async (req, res) => {
   try {
-    const identifier = req.params.id;
-    let result;
+    const identifier = decodeURIComponent(req.params.id);
+    console.log('Deleting identifier:', identifier);
     
+    let result;
     if (identifier.includes('.')) {
-      // Delete entire document group by filename
       result = await knowledgeDB.deleteDocumentGroup(identifier);
-    } else if (isNaN(identifier)) {
-      // Delete by title (for documents without filename)
-      result = await knowledgeDB.deleteDocumentsByTitle(identifier);
     } else {
-      // Delete single chunk by ID
-      const id = parseInt(identifier);
-      await knowledgeDB.deleteDocument(id);
-      result = { success: true, deletedCount: 1 };
+      result = await knowledgeDB.deleteDocumentsByTitle(identifier);
     }
     
+    console.log('Delete result:', result);
     res.json(result);
   } catch (error) {
     console.error('Delete document error:', error);
@@ -1473,7 +1468,9 @@ app.delete('/api/knowledge-base/documents/:id', verifyToken, async (req, res) =>
 // Get unique document names for cleanup
 app.get('/api/knowledge-base/document-names', verifyToken, async (req, res) => {
   try {
-    const names = await knowledgeDB.getUniqueDocumentNames();
+    const docs = await knowledgeDB.getGroupedDocuments(1000);
+    const names = docs.map(doc => doc.groupKey);
+    console.log('Document names:', names);
     res.json(names);
   } catch (error) {
     console.error('Get document names error:', error);
@@ -1485,6 +1482,7 @@ app.get('/api/knowledge-base/document-names', verifyToken, async (req, res) => {
 app.post('/api/knowledge-base/bulk-delete', verifyToken, async (req, res) => {
   try {
     const { documentNames } = req.body;
+    console.log('Bulk deleting:', documentNames);
     
     if (!documentNames || !Array.isArray(documentNames)) {
       return res.status(400).json({ error: 'Document names array required' });
@@ -1501,13 +1499,16 @@ app.post('/api/knowledge-base/bulk-delete', verifyToken, async (req, res) => {
         } else {
           result = await knowledgeDB.deleteDocumentsByTitle(name);
         }
-        results.push({ name, success: true, deletedCount: result.deletedCount });
-        totalDeleted += result.deletedCount;
+        console.log(`Deleted ${name}:`, result);
+        results.push({ name, success: true, deletedCount: result.deletedCount || 0 });
+        totalDeleted += result.deletedCount || 0;
       } catch (error) {
+        console.log(`Failed to delete ${name}:`, error);
         results.push({ name, success: false, error: error.message });
       }
     }
     
+    console.log('Bulk delete results:', { totalDeleted, results });
     res.json({ 
       success: true, 
       totalDeleted, 
