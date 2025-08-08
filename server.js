@@ -92,7 +92,7 @@ const CUSTOMER_IDLE_WARNING = 10 * 60 * 1000; // 10 minutes for idle warning
 const CUSTOMER_IDLE_TIMEOUT = (10 * 60 * 1000) + (30 * 1000); // 10 minutes + 30 seconds total
 const AGENT_RECONNECT_WINDOW = 5 * 60 * 1000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
-const SIMILARITY_THRESHOLD = 0.4; // Minimum similarity for knowledge base answers
+const SIMILARITY_THRESHOLD = 0.5; // Minimum similarity for knowledge base answers
 const HANDOFF_THRESHOLD = 0.8; // Threshold for intelligent handoff detection
 
 // ========== VECTOR DATABASE FUNCTIONS ========== //
@@ -194,7 +194,7 @@ async function analyzeHandoffIntent(message, conversationHistory = []) {
 // ========== ENHANCED AI RESPONSE GENERATION ========== //
 async function generateAIResponse(userMessage, conversationHistory = []) {
   try {
-    // Handle greeting messages with friendly responses
+    // Handle greeting messages
     const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
     const isGreeting = greetings.some(greeting => 
       userMessage.toLowerCase().trim() === greeting || userMessage.toLowerCase().includes(greeting + ' ') || userMessage.toLowerCase().includes(' ' + greeting)
@@ -208,11 +208,47 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
-    // First, search the knowledge base for ALL messages
+    // Handle meta questions about capabilities
+    const metaQuestions = ['what else do you know', 'what can you help', 'what do you know', 'what topics', 'what can you answer'];
+    const isMetaQuestion = metaQuestions.some(meta => 
+      userMessage.toLowerCase().includes(meta)
+    );
+
+    if (isMetaQuestion) {
+      return {
+        type: 'ai_response',
+        message: "I can help you with questions about company policies, office procedures, employee guidelines, and workplace information. Feel free to ask me anything specific!",
+        sources: []
+      };
+    }
+
+    // Check if it's a question
+    const isQuestion = userMessage.includes('?') || 
+                      userMessage.toLowerCase().startsWith('what') ||
+                      userMessage.toLowerCase().startsWith('how') ||
+                      userMessage.toLowerCase().startsWith('when') ||
+                      userMessage.toLowerCase().startsWith('where') ||
+                      userMessage.toLowerCase().startsWith('why') ||
+                      userMessage.toLowerCase().startsWith('can') ||
+                      userMessage.toLowerCase().startsWith('do') ||
+                      userMessage.toLowerCase().startsWith('does') ||
+                      userMessage.toLowerCase().startsWith('is') ||
+                      userMessage.toLowerCase().startsWith('are');
+
+    // For non-questions, respond conversationally without knowledge base
+    if (!isQuestion) {
+      return {
+        type: 'ai_response',
+        message: "I'm here to help answer your questions about company policies and procedures. What would you like to know?",
+        sources: []
+      };
+    }
+
+    // For questions, search knowledge base
     const knowledgeResults = await searchKnowledgeBase(userMessage);
     console.log(`📊 Knowledge search results: ${knowledgeResults.length} found`);
 
-    // If no knowledge found, suggest human handoff
+    // If no knowledge found for question, suggest human handoff
     if (knowledgeResults.length === 0) {
       return {
         type: 'handoff_suggestion',
@@ -229,7 +265,7 @@ ${knowledgeResults.map(item => `- ${item.content}`).join('\n')}
 
 Customer question: "${userMessage}"
 
-If the knowledge base information doesn't contain enough details to fully answer the question, say "Based on the available information..." and provide what you can from the knowledge base.`;
+Answer based strictly on the provided information.`;
 
     const result = await model.generateContent(context);
     const responseText = result.response.text();
