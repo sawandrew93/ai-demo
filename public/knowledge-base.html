@@ -620,9 +620,7 @@
                                 <span><strong>Characters:</strong> ${doc.metadata?.total_characters || 0}</span>
                                 ${doc.originalFilename ? `<span><strong>File:</strong> ${doc.originalFilename}</span>` : ''}
                             </div>
-                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteDocument('${doc.groupKey}', '${doc.title}')">
-                                🗑️ Delete All
-                            </button>
+                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteDocument('${doc.groupKey.replace(/'/g, '\\\'')}', '${doc.title.replace(/'/g, '\\\'')}')">🗑️ Delete All</button>
                         </div>
                     </div>
                 `).join('');
@@ -632,31 +630,24 @@
         }
 
         // Delete document group (all chunks)
-        async function deleteDocument(groupKey, title) {
+        function deleteDocument(groupKey, title) {
             const displayName = title || groupKey;
-            if (!confirm(`Are you sure you want to delete ALL chunks of "${displayName}"? This action cannot be undone.`)) {
-                return;
-            }
+            if (!confirm(`Delete ALL chunks of "${displayName}"?`)) return;
 
-            try {
-                const response = await makeAuthenticatedRequest(`/api/knowledge-base/documents/${encodeURIComponent(groupKey)}`, {
-                    method: 'DELETE'
-                });
-                
-                if (!response) return;
-
-                const result = await response.json();
-
+            fetch(`/api/knowledge-base/documents/${encodeURIComponent(groupKey)}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('agentToken')}` }
+            })
+            .then(r => r.json())
+            .then(result => {
                 if (result.success) {
-                    const deletedCount = result.deletedCount || 1;
-                    showStatus('manageStatus', `Successfully deleted ${deletedCount} chunks of "${displayName}"`, 'success');
+                    showStatus('manageStatus', `Deleted ${result.deletedCount || 1} chunks`, 'success');
                     loadDocuments();
                 } else {
-                    showStatus('manageStatus', result.error || 'Delete failed', 'error');
+                    showStatus('manageStatus', 'Delete failed', 'error');
                 }
-            } catch (error) {
-                showStatus('manageStatus', 'Delete failed: ' + error.message, 'error');
-            }
+            })
+            .catch(() => showStatus('manageStatus', 'Delete failed', 'error'));
         }
 
         // Test search
@@ -796,49 +787,43 @@
         }
         
         // Perform bulk delete
-        async function performBulkDelete(button) {
+        function performBulkDelete(button) {
             const modal = button.closest('.modal');
-            const selectedCheckboxes = modal.querySelectorAll('input[type="checkbox"]:checked:not(#selectAll)');
-            const selectedNames = Array.from(selectedCheckboxes).map(cb => cb.value);
+            const selected = Array.from(modal.querySelectorAll('input[type="checkbox"]:checked:not(#selectAll)')).map(cb => cb.value);
             
-            if (selectedNames.length === 0) {
-                alert('Please select at least one document to delete.');
+            if (selected.length === 0) {
+                alert('Select documents to delete');
                 return;
             }
             
-            if (!confirm(`Are you sure you want to delete ${selectedNames.length} documents? This will remove ALL chunks and cannot be undone.`)) {
-                return;
-            }
+            if (!confirm(`Delete ${selected.length} documents?`)) return;
             
             button.disabled = true;
             button.textContent = 'Deleting...';
             
-            try {
-                const response = await makeAuthenticatedRequest('/api/knowledge-base/bulk-delete', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ documentNames: selectedNames })
-                });
-                
-                if (!response) return;
-                
-                const result = await response.json();
-                
+            fetch('/api/knowledge-base/bulk-delete', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('agentToken')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ documentNames: selected })
+            })
+            .then(r => r.json())
+            .then(result => {
                 if (result.success) {
-                    showStatus('manageStatus', `Successfully deleted ${result.totalDeleted} chunks from ${selectedNames.length} documents`, 'success');
+                    showStatus('manageStatus', `Deleted ${result.totalDeleted} chunks`, 'success');
                     modal.remove();
                     loadDocuments();
                 } else {
-                    showStatus('manageStatus', 'Bulk delete failed', 'error');
+                    showStatus('manageStatus', 'Delete failed', 'error');
                 }
-            } catch (error) {
-                showStatus('manageStatus', 'Bulk delete failed: ' + error.message, 'error');
-            } finally {
+            })
+            .catch(() => showStatus('manageStatus', 'Delete failed', 'error'))
+            .finally(() => {
                 button.disabled = false;
                 button.textContent = 'Delete Selected';
-            }
+            });
         }
 
         // Show status message
