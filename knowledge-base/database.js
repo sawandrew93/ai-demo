@@ -112,7 +112,7 @@ class KnowledgeBaseDB {
         const groupKey = doc.title;
         if (!grouped[groupKey]) {
           grouped[groupKey] = {
-            id: doc.id,
+            id: doc.title, // Use title as ID for group deletion
             title: doc.title,
             content: doc.content.substring(0, 200) + '...',
             metadata: {

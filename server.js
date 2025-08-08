@@ -1447,14 +1447,16 @@ app.get('/api/knowledge-base/documents', verifyToken, async (req, res) => {
 // Delete document
 app.delete('/api/knowledge-base/documents/:id', verifyToken, async (req, res) => {
   try {
-    const filename = req.params.id;
-    if (filename.includes('.')) {
-      // Delete entire document group by filename
-      await knowledgeDB.deleteDocumentGroup(filename);
-    } else {
+    const identifier = req.params.id;
+    
+    // Check if it's a numeric ID (single chunk) or title (document group)
+    if (/^\d+$/.test(identifier)) {
       // Delete single chunk by ID
-      const id = parseInt(filename);
+      const id = parseInt(identifier);
       await knowledgeDB.deleteDocument(id);
+    } else {
+      // Delete entire document group by title
+      await knowledgeDB.deleteDocumentGroup(identifier);
     }
     res.json({ success: true });
   } catch (error) {
