@@ -92,7 +92,7 @@ const CUSTOMER_IDLE_WARNING = 10 * 60 * 1000; // 10 minutes for idle warning
 const CUSTOMER_IDLE_TIMEOUT = (10 * 60 * 1000) + (30 * 1000); // 10 minutes + 30 seconds total
 const AGENT_RECONNECT_WINDOW = 5 * 60 * 1000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
-const SIMILARITY_THRESHOLD = 0.5; // Minimum similarity for knowledge base answers
+const SIMILARITY_THRESHOLD = 0.4; // Minimum similarity for knowledge base answers
 const HANDOFF_THRESHOLD = 0.8; // Threshold for intelligent handoff detection
 
 // ========== VECTOR DATABASE FUNCTIONS ========== //
@@ -201,7 +201,6 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     ) && userMessage.length < 30;
 
     if (isGreeting) {
-      // For greetings, skip handoff analysis and return friendly response only
       return {
         type: 'ai_response',
         message: "Hi there! 👋 How can I help you today?",
@@ -209,86 +208,31 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
-    // Handle meta questions about capabilities
-    const metaQuestions = ['what can you help', 'what can i ask', 'what do you know', 'what topics', 'what can you answer'];
-    const isMetaQuestion = metaQuestions.some(meta => 
-      userMessage.toLowerCase().includes(meta)
-    );
-
-    if (isMetaQuestion) {
-      // Get sample topics from knowledge base
-      const sampleResults = await knowledgeDB.getAllDocuments(10);
-      const topics = sampleResults.map(doc => doc.metadata?.category || 'General').filter((v, i, a) => a.indexOf(v) === i);
-      
-      return {
-        type: 'ai_response',
-        message: `I can help you with questions about: ${topics.length > 0 ? topics.join(', ') : 'our products and services'}. Feel free to ask me anything about these topics!`,
-        sources: []
-      };
-    }
-
-    // First, search the knowledge base
+    // First, search the knowledge base for ALL messages
     const knowledgeResults = await searchKnowledgeBase(userMessage);
+    console.log(`📊 Knowledge search results: ${knowledgeResults.length} found`);
 
-    // Only analyze handoff intent if not a greeting
-    const handoffAnalysis = await analyzeHandoffIntent(userMessage, conversationHistory);
-
-    // If high confidence handoff intent, return handoff suggestion
-    if (handoffAnalysis.needsHuman && handoffAnalysis.confidence > HANDOFF_THRESHOLD) {
+    // If no knowledge found, suggest human handoff
+    if (knowledgeResults.length === 0) {
       return {
         type: 'handoff_suggestion',
-        message: handoffAnalysis.suggestedResponse || "I'd be happy to connect you with one of our sales specialists who can give you personalized assistance.",
-        reason: handoffAnalysis.reason
+        message: "I don't have specific information about that in my knowledge base. Would you like to connect with human support?",
+        reason: "No relevant knowledge found"
       };
     }
 
-    // Check if message is a question
-    const isQuestion = userMessage.includes('?') || 
-                      userMessage.toLowerCase().startsWith('what') ||
-                      userMessage.toLowerCase().startsWith('how') ||
-                      userMessage.toLowerCase().startsWith('when') ||
-                      userMessage.toLowerCase().startsWith('where') ||
-                      userMessage.toLowerCase().startsWith('why') ||
-                      userMessage.toLowerCase().startsWith('can') ||
-                      userMessage.toLowerCase().startsWith('do') ||
-                      userMessage.toLowerCase().startsWith('does') ||
-                      userMessage.toLowerCase().startsWith('is') ||
-                      userMessage.toLowerCase().startsWith('are');
-
-    let context;
-    if (isQuestion && knowledgeResults.length === 0) {
-      // No knowledge found for question - suggest human handoff
-      return {
-        type: 'handoff_suggestion',
-        message: "I'm sorry, I couldn't find specific information about that. Would you like to connect with human support?",
-        reason: "No relevant knowledge found for customer question"
-      };
-    } else if (isQuestion) {
-      // Question with knowledge available
-      context = `You are a helpful customer support assistant. Please answer customer questions using only the information provided from the documents table in the Supabase datastore.
+    // Generate response using ONLY knowledge base information
+    const context = `You are a helpful assistant. Answer the customer's question using ONLY the information provided below. Do not add any information that is not explicitly stated in the knowledge base.
 
 Knowledge base information:
 ${knowledgeResults.map(item => `- ${item.content}`).join('\n')}
 
 Customer question: "${userMessage}"
 
-Answer based ONLY on the knowledge base information above. Be direct and concise.`;
-    } else {
-      // Not a question - reply without checking knowledge base
-      context = `You are a helpful customer support assistant. The customer said: "${userMessage}"
-
-This is not a question, so respond appropriately without needing to check any knowledge base. Be friendly and helpful.`;
-    }
+If the knowledge base information doesn't contain enough details to fully answer the question, say "Based on the available information..." and provide what you can from the knowledge base.`;
 
     const result = await model.generateContent(context);
     const responseText = result.response.text();
-
-    // Determine intent category from knowledge results
-    const category = knowledgeResults[0]?.metadata?.category || 'general';
-    const intent = userMessage.toLowerCase().includes('price') || userMessage.toLowerCase().includes('cost') ? 'pricing' :
-                  userMessage.toLowerCase().includes('trial') ? 'trial' :
-                  userMessage.toLowerCase().includes('cancel') ? 'cancellation' :
-                  userMessage.toLowerCase().includes('support') ? 'support' : 'general';
 
     return {
       type: 'ai_response',
@@ -297,15 +241,15 @@ This is not a question, so respond appropriately without needing to check any kn
         content: item.content.substring(0, 100) + '...',
         similarity: item.similarity
       })),
-      intent: intent,
-      category: category
+      intent: 'general',
+      category: 'general'
     };
 
   } catch (error) {
     console.error('AI generation error:', error);
     return {
       type: 'error',
-      message: "Oops! I'm having a bit of trouble right now. Would you like to connect with human support?"
+      message: "I'm having trouble right now. Would you like to connect with human support?"
     };
   }
 }
