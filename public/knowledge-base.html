@@ -205,9 +205,10 @@
         .document-meta {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             font-size: 0.8rem;
             color: #94a3b8;
+            margin-top: 10px;
         }
 
         .status {
@@ -332,7 +333,10 @@
             
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h3>Your Documents</h3>
-                <button class="btn btn-secondary" onclick="loadDocuments()">🔄 Refresh</button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" onclick="showCleanupDialog()">🧹 Cleanup</button>
+                    <button class="btn btn-secondary" onclick="loadDocuments()">🔄 Refresh</button>
+                </div>
             </div>
 
             <div class="documents-grid" id="documentsGrid">
@@ -608,11 +612,16 @@
                 grid.innerHTML = documents.map(doc => `
                     <div class="document-card">
                         <div class="document-title">${doc.title || 'Untitled'}</div>
-                        <div class="document-content">${doc.content.substring(0, 150)}...</div>
+                        <div class="document-content">${doc.content}</div>
                         <div class="document-meta">
-                            <span>${doc.metadata?.source_type || 'manual'}</span>
-                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteDocument(${doc.id})">
-                                🗑️ Delete
+                            <div style="display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem;">
+                                <span><strong>Type:</strong> ${doc.metadata?.source_type || 'manual'}</span>
+                                <span><strong>Chunks:</strong> ${doc.metadata?.total_chunks || 1}</span>
+                                <span><strong>Characters:</strong> ${doc.metadata?.total_characters || 0}</span>
+                                ${doc.originalFilename ? `<span><strong>File:</strong> ${doc.originalFilename}</span>` : ''}
+                            </div>
+                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteDocument('${doc.groupKey}', '${doc.title}')">
+                                🗑️ Delete All
                             </button>
                         </div>
                     </div>
@@ -622,14 +631,15 @@
             }
         }
 
-        // Delete document
-        async function deleteDocument(id) {
-            if (!confirm('Are you sure you want to delete this document?')) {
+        // Delete document group (all chunks)
+        async function deleteDocument(groupKey, title) {
+            const displayName = title || groupKey;
+            if (!confirm(`Are you sure you want to delete ALL chunks of "${displayName}"? This action cannot be undone.`)) {
                 return;
             }
 
             try {
-                const response = await makeAuthenticatedRequest(`/api/knowledge-base/documents/${id}`, {
+                const response = await makeAuthenticatedRequest(`/api/knowledge-base/documents/${encodeURIComponent(groupKey)}`, {
                     method: 'DELETE'
                 });
                 
@@ -638,7 +648,8 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showStatus('manageStatus', 'Document deleted successfully', 'success');
+                    const deletedCount = result.deletedCount || 1;
+                    showStatus('manageStatus', `Successfully deleted ${deletedCount} chunks of "${displayName}"`, 'success');
                     loadDocuments();
                 } else {
                     showStatus('manageStatus', result.error || 'Delete failed', 'error');
@@ -712,6 +723,121 @@
                 `;
             } catch (error) {
                 console.error('Failed to load stats:', error);
+            }
+        }
+
+        // Show cleanup dialog
+        async function showCleanupDialog() {
+            try {
+                const response = await makeAuthenticatedRequest('/api/knowledge-base/document-names');
+                if (!response) return;
+                
+                const documentNames = await response.json();
+                
+                if (documentNames.length === 0) {
+                    showStatus('manageStatus', 'No documents found to clean up', 'info');
+                    return;
+                }
+                
+                // Create a modal dialog
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.5); z-index: 1000; display: flex; 
+                    align-items: center; justify-content: center;
+                `;
+                
+                const dialog = document.createElement('div');
+                dialog.style.cssText = `
+                    background: white; padding: 30px; border-radius: 10px; 
+                    max-width: 600px; max-height: 80vh; overflow-y: auto;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                `;
+                
+                const checkboxes = documentNames.map(name => `
+                    <label style="display: block; margin: 10px 0; cursor: pointer;">
+                        <input type="checkbox" value="${name}" style="margin-right: 10px;">
+                        <span>${name}</span>
+                    </label>
+                `).join('');
+                
+                dialog.innerHTML = `
+                    <h3 style="margin-bottom: 20px;">🧹 Cleanup Documents</h3>
+                    <p style="margin-bottom: 20px; color: #666;">Select documents to delete. This will remove ALL chunks for each selected document.</p>
+                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+                        <label style="display: block; margin-bottom: 15px; font-weight: bold;">
+                            <input type="checkbox" id="selectAll" style="margin-right: 10px;">
+                            Select All
+                        </label>
+                        <hr style="margin-bottom: 15px;">
+                        ${checkboxes}
+                    </div>
+                    <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                        <button class="btn btn-danger" onclick="performBulkDelete(this)">Delete Selected</button>
+                    </div>
+                `;
+                
+                modal.className = 'modal';
+                modal.appendChild(dialog);
+                document.body.appendChild(modal);
+                
+                // Handle select all
+                const selectAll = dialog.querySelector('#selectAll');
+                const checkboxList = dialog.querySelectorAll('input[type="checkbox"]:not(#selectAll)');
+                
+                selectAll.addEventListener('change', () => {
+                    checkboxList.forEach(cb => cb.checked = selectAll.checked);
+                });
+                
+            } catch (error) {
+                showStatus('manageStatus', 'Failed to load document names: ' + error.message, 'error');
+            }
+        }
+        
+        // Perform bulk delete
+        async function performBulkDelete(button) {
+            const modal = button.closest('.modal');
+            const selectedCheckboxes = modal.querySelectorAll('input[type="checkbox"]:checked:not(#selectAll)');
+            const selectedNames = Array.from(selectedCheckboxes).map(cb => cb.value);
+            
+            if (selectedNames.length === 0) {
+                alert('Please select at least one document to delete.');
+                return;
+            }
+            
+            if (!confirm(`Are you sure you want to delete ${selectedNames.length} documents? This will remove ALL chunks and cannot be undone.`)) {
+                return;
+            }
+            
+            button.disabled = true;
+            button.textContent = 'Deleting...';
+            
+            try {
+                const response = await makeAuthenticatedRequest('/api/knowledge-base/bulk-delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ documentNames: selectedNames })
+                });
+                
+                if (!response) return;
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus('manageStatus', `Successfully deleted ${result.totalDeleted} chunks from ${selectedNames.length} documents`, 'success');
+                    modal.remove();
+                    loadDocuments();
+                } else {
+                    showStatus('manageStatus', 'Bulk delete failed', 'error');
+                }
+            } catch (error) {
+                showStatus('manageStatus', 'Bulk delete failed: ' + error.message, 'error');
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Delete Selected';
             }
         }
 

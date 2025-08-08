@@ -95,6 +95,31 @@ class KnowledgeBaseDB {
     }
   }
 
+  async getUniqueDocumentNames() {
+    try {
+      const { data, error } = await this.supabase
+        .from('documents')
+        .select('title, metadata')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      // Get unique document names
+      const uniqueNames = new Set();
+      data.forEach(doc => {
+        const name = doc.metadata?.filename || doc.title;
+        uniqueNames.add(name);
+      });
+
+      return Array.from(uniqueNames);
+    } catch (error) {
+      console.error('❌ Error fetching unique document names:', error);
+      throw error;
+    }
+  }
+
   async getGroupedDocuments(limit = 100) {
     try {
       const { data, error } = await this.supabase
@@ -106,14 +131,20 @@ class KnowledgeBaseDB {
         throw error;
       }
 
-      // Group by filename and show summary
+      // Group by filename (preferred) or title as fallback
       const grouped = {};
       data.forEach(doc => {
-        const filename = doc.metadata?.filename || doc.title;
-        if (!grouped[filename]) {
-          grouped[filename] = {
+        // Use filename from metadata if available, otherwise use title
+        const groupKey = doc.metadata?.filename || doc.title;
+        const displayName = doc.metadata?.filename ? 
+          doc.metadata.filename.replace(/\.[^/.]+$/, '') : // Remove extension for display
+          doc.title;
+        
+        if (!grouped[groupKey]) {
+          grouped[groupKey] = {
             id: doc.id,
-            title: filename,
+            title: displayName,
+            originalFilename: doc.metadata?.filename,
             content: doc.content.substring(0, 200) + '...',
             metadata: {
               ...doc.metadata,
@@ -122,12 +153,13 @@ class KnowledgeBaseDB {
             },
             created_at: doc.created_at,
             source_type: doc.source_type,
-            chunks: []
+            chunks: [],
+            groupKey: groupKey // Store the key used for grouping
           };
         }
-        grouped[filename].chunks.push(doc);
-        grouped[filename].metadata.total_chunks++;
-        grouped[filename].metadata.total_characters += doc.content.length;
+        grouped[groupKey].chunks.push(doc);
+        grouped[groupKey].metadata.total_chunks++;
+        grouped[groupKey].metadata.total_characters += doc.content.length;
       });
 
       return Object.values(grouped).slice(0, limit);
@@ -139,6 +171,17 @@ class KnowledgeBaseDB {
 
   async deleteDocumentGroup(filename) {
     try {
+      // First get count of documents to be deleted
+      const { count, error: countError } = await this.supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('metadata->>filename', filename);
+
+      if (countError) {
+        throw countError;
+      }
+
+      // Delete all documents with this filename
       const { error } = await this.supabase
         .from('documents')
         .delete()
@@ -148,10 +191,40 @@ class KnowledgeBaseDB {
         throw error;
       }
 
-      console.log(`✅ Deleted all chunks for: ${filename}`);
-      return true;
+      console.log(`✅ Deleted ${count} chunks for: ${filename}`);
+      return { success: true, deletedCount: count };
     } catch (error) {
       console.error('❌ Error deleting document group:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocumentsByTitle(title) {
+    try {
+      // First get count of documents to be deleted
+      const { count, error: countError } = await this.supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('title', title);
+
+      if (countError) {
+        throw countError;
+      }
+
+      // Delete all documents with this title
+      const { error } = await this.supabase
+        .from('documents')
+        .delete()
+        .eq('title', title);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`✅ Deleted ${count} chunks for title: ${title}`);
+      return { success: true, deletedCount: count };
+    } catch (error) {
+      console.error('❌ Error deleting documents by title:', error);
       throw error;
     }
   }

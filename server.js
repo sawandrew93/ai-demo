@@ -1395,8 +1395,9 @@ app.post('/api/knowledge-base/upload', verifyToken, kbUpload.array('documents', 
         // Determine file type and process accordingly
         const fileExt = file.originalname.split('.').pop().toLowerCase();
         const cleanTitle = title || file.originalname.replace(/\.[^/.]+$/, '');
+        const filename = file.originalname;
         
-        const result = await pdfIngestionService.ingestPDF(file.path, cleanTitle);
+        const result = await pdfIngestionService.ingestPDF(file.path, cleanTitle, filename);
         results.push({ filename: file.originalname, ...result });
         if (result.success) successCount++;
         
@@ -1446,18 +1447,74 @@ app.get('/api/knowledge-base/documents', verifyToken, async (req, res) => {
 // Delete document
 app.delete('/api/knowledge-base/documents/:id', verifyToken, async (req, res) => {
   try {
-    const filename = req.params.id;
-    if (filename.includes('.')) {
+    const identifier = req.params.id;
+    let result;
+    
+    if (identifier.includes('.')) {
       // Delete entire document group by filename
-      await knowledgeDB.deleteDocumentGroup(filename);
+      result = await knowledgeDB.deleteDocumentGroup(identifier);
+    } else if (isNaN(identifier)) {
+      // Delete by title (for documents without filename)
+      result = await knowledgeDB.deleteDocumentsByTitle(identifier);
     } else {
       // Delete single chunk by ID
-      const id = parseInt(filename);
+      const id = parseInt(identifier);
       await knowledgeDB.deleteDocument(id);
+      result = { success: true, deletedCount: 1 };
     }
-    res.json({ success: true });
+    
+    res.json(result);
   } catch (error) {
     console.error('Delete document error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get unique document names for cleanup
+app.get('/api/knowledge-base/document-names', verifyToken, async (req, res) => {
+  try {
+    const names = await knowledgeDB.getUniqueDocumentNames();
+    res.json(names);
+  } catch (error) {
+    console.error('Get document names error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk delete documents
+app.post('/api/knowledge-base/bulk-delete', verifyToken, async (req, res) => {
+  try {
+    const { documentNames } = req.body;
+    
+    if (!documentNames || !Array.isArray(documentNames)) {
+      return res.status(400).json({ error: 'Document names array required' });
+    }
+    
+    let totalDeleted = 0;
+    const results = [];
+    
+    for (const name of documentNames) {
+      try {
+        let result;
+        if (name.includes('.')) {
+          result = await knowledgeDB.deleteDocumentGroup(name);
+        } else {
+          result = await knowledgeDB.deleteDocumentsByTitle(name);
+        }
+        results.push({ name, success: true, deletedCount: result.deletedCount });
+        totalDeleted += result.deletedCount;
+      } catch (error) {
+        results.push({ name, success: false, error: error.message });
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      totalDeleted, 
+      results 
+    });
+  } catch (error) {
+    console.error('Bulk delete error:', error);
     res.status(500).json({ error: error.message });
   }
 });

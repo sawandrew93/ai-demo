@@ -13,7 +13,7 @@ class PDFIngestionService {
     this.db = new KnowledgeBaseDB();
   }
 
-  async ingestPDF(filePath, title = '') {
+  async ingestPDF(filePath, title = '', originalFilename = '') {
     try {
       console.log(`🚀 Starting PDF ingestion: ${filePath}`);
       
@@ -26,6 +26,11 @@ class PDFIngestionService {
 
       // Process the document
       const result = await this.processor.processDocument(filePath, title, 'pdf');
+      
+      // Set the filename in metadata if provided
+      if (originalFilename) {
+        result.metadata.filename = originalFilename;
+      }
       
       console.log(`📝 Processing ${result.chunks.length} chunks...`);
       
@@ -46,6 +51,7 @@ class PDFIngestionService {
             content: chunk.content,
             metadata: {
               ...result.metadata,
+              filename: result.metadata.filename || originalFilename || result.metadata.filename,
               chunk_index: i,
               total_chunks: result.chunks.length,
               chunk_length: chunk.length
