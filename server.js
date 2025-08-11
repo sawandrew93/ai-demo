@@ -223,11 +223,21 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     }
 
     // Handle explicit human support requests
-    const humanRequestKeywords = [
-      'talk with support', 'talk with human', 'speak with agent', 'connect with human', 
+    const humanRequestKeywords = [      
+      'talk with support', 'talk with human', 'speak with agent', 'connect with human',
       'human support', 'live agent', 'real person', 'support assistant', 'customer support',
-      'can i talk with', 'speak to someone', 'talk to someone', 'human agent', 'representative'
+      'can i talk with', 'speak to someone', 'talk to someone', 'human agent', 'representative',
+      'talk to a person', 'talk with a person', 'speak to a human', 'speak with a human',
+      'get me a human', 'i want a human', 'i need a human', 'human please', 'live person',
+      'connect me to a human', 'can i speak to a human', 'can i talk to an agent',
+      'talk to customer service', 'speak to customer service', 'get customer service',
+      'human operator', 'talk to operator', 'operator please', 'get me support',
+      'i want to talk to a person', 'i want to talk to an agent', 'contact human',
+      'contact agent', 'contact support', 'customer care', 'real agent', 'talk to rep',
+      'speak to rep', 'live rep', 'connect to live agent', 'transfer to agent',
+      'talk to live support', 'can i speak to someone', 'can i talk to someone'
     ];
+
     const isHumanRequest = humanRequestKeywords.some(keyword => 
       userMessage.toLowerCase().includes(keyword)
     );
