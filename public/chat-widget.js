@@ -22,6 +22,8 @@
       this.idleWarningTimer = null;
       this.lastActivity = Date.now();
       this.idleWarningShown = false;
+      this.customerInfo = null;
+      this.hasCollectedInfo = false;
 
       this.init();
     }
@@ -49,6 +51,29 @@
       }
     }
 
+    saveCustomerInfo() {
+      try {
+        localStorage.setItem('chat_customer_info', JSON.stringify(this.customerInfo));
+        localStorage.setItem('chat_info_collected', 'true');
+      } catch (error) {
+        console.error('Error saving customer info:', error);
+      }
+    }
+
+    loadCustomerInfo() {
+      try {
+        const savedInfo = localStorage.getItem('chat_customer_info');
+        const infoCollected = localStorage.getItem('chat_info_collected');
+        if (savedInfo && infoCollected === 'true') {
+          this.customerInfo = JSON.parse(savedInfo);
+          this.hasCollectedInfo = true;
+          console.log('Loaded customer info:', this.customerInfo);
+        }
+      } catch (error) {
+        console.error('Error loading customer info:', error);
+      }
+    }
+
     loadMessages() {
       try {
         const savedMessages = localStorage.getItem('chat_messages_' + this.sessionId);
@@ -68,7 +93,11 @@
       localStorage.removeItem('chat_messages_' + this.sessionId);
       localStorage.removeItem('chat_connection_state');
       localStorage.removeItem('chat_last_activity');
+      localStorage.removeItem('chat_customer_info');
+      localStorage.removeItem('chat_info_collected');
       this.messages = [];
+      this.customerInfo = null;
+      this.hasCollectedInfo = false;
     }
 
     saveConnectionState() {
@@ -99,16 +128,21 @@
 
     init() {
       this.createWidget();
-      this.restoreMessages();
-      this.connectWebSocket();
-      this.startIdleTimer();
+      this.loadCustomerInfo();
+      if (!this.hasCollectedInfo) {
+        this.showCustomerInfoDialog();
+      } else {
+        this.restoreMessages();
+        this.connectWebSocket();
+        this.startIdleTimer();
 
-      const connectionState = this.loadConnectionState();
-      if (connectionState) {
-        this.updateConnectionStatus(
-          this.isConnectedToHuman ? 'Human Agent' : 'AI Assistant',
-          'Reconnecting to previous session...'
-        );
+        const connectionState = this.loadConnectionState();
+        if (connectionState) {
+          this.updateConnectionStatus(
+            this.isConnectedToHuman ? 'Human Agent' : 'AI Assistant',
+            'Reconnecting to previous session...'
+          );
+        }
       }
     }
 
@@ -186,17 +220,14 @@
             <!-- Customer Info Dialog -->
             <div id="customer-info-dialog" class="handoff-dialog" style="display: none;">
               <div class="handoff-content">
-                <h4>Connect with Human Support</h4>
-                <p>Please provide your information to connect with our support team:</p>
+                <h4>Welcome! Let's get started</h4>
+                <p>Please provide your information to begin the conversation:</p>
                 <div class="customer-form">
-                  <input type="text" id="customer-firstname" placeholder="First Name *" required>
-                  <input type="text" id="customer-lastname" placeholder="Last Name *" required>
+                  <input type="text" id="customer-company" placeholder="Company Name *" required>
                   <input type="email" id="customer-email" placeholder="Email Address *" required>
-                  <input type="text" id="customer-country" placeholder="Country *" required>
                 </div>
                 <div class="handoff-buttons">
-                  <button id="customer-info-submit" class="handoff-btn handoff-yes">Connect</button>
-                  <button id="customer-info-cancel" class="handoff-btn handoff-no">Cancel</button>
+                  <button id="customer-info-submit" class="handoff-btn handoff-yes">Start Chat</button>
                 </div>
               </div>
             </div>
@@ -1204,47 +1235,6 @@
     requestHuman() {
       console.log('Human support button clicked');
       this.resetIdleTimer();
-      this.showCustomerInfoDialog();
-    }
-
-    showCustomerInfoDialog() {
-      document.getElementById('customer-info-dialog').style.display = 'block';
-    }
-
-    hideCustomerInfoDialog() {
-      document.getElementById('customer-info-dialog').style.display = 'none';
-      this.clearCustomerForm();
-    }
-
-    clearCustomerForm() {
-      document.getElementById('customer-firstname').value = '';
-      document.getElementById('customer-lastname').value = '';
-      document.getElementById('customer-email').value = '';
-      document.getElementById('customer-country').value = '';
-    }
-
-    submitCustomerInfo() {
-      console.log('Submitting customer info for human support');
-      const firstname = document.getElementById('customer-firstname').value.trim();
-      const lastname = document.getElementById('customer-lastname').value.trim();
-      const email = document.getElementById('customer-email').value.trim();
-      const country = document.getElementById('customer-country').value.trim();
-
-      if (!firstname || !lastname || !email || !country) {
-        alert('Please fill in all required fields.');
-        return;
-      }
-
-      if (!this.isValidEmail(email)) {
-        alert('Please enter a valid email address.');
-        return;
-      }
-
-      this.customerInfo = { firstname, lastname, email, country };
-      this.hideCustomerInfoDialog();
-
-      console.log('WebSocket state:', this.ws ? this.ws.readyState : 'null');
-      console.log('Session ID:', this.sessionId);
       
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         console.log('Sending human request to server');
@@ -1259,6 +1249,47 @@
         console.log('WebSocket not available');
         this.addMessage('Unable to connect to server. Please try again.', 'system');
       }
+    }
+
+    showCustomerInfoDialog() {
+      document.getElementById('customer-info-dialog').style.display = 'block';
+    }
+
+    hideCustomerInfoDialog() {
+      document.getElementById('customer-info-dialog').style.display = 'none';
+      this.clearCustomerForm();
+    }
+
+    clearCustomerForm() {
+      document.getElementById('customer-company').value = '';
+      document.getElementById('customer-email').value = '';
+    }
+
+    submitCustomerInfo() {
+      const company = document.getElementById('customer-company').value.trim();
+      const email = document.getElementById('customer-email').value.trim();
+
+      if (!company || !email) {
+        alert('Please fill in all required fields.');
+        return;
+      }
+
+      if (!this.isValidEmail(email)) {
+        alert('Please enter a valid email address.');
+        return;
+      }
+
+      this.customerInfo = { company, email };
+      this.hasCollectedInfo = true;
+      this.saveCustomerInfo();
+      this.hideCustomerInfoDialog();
+
+      // Now initialize the chat
+      this.restoreMessages();
+      this.connectWebSocket();
+      this.startIdleTimer();
+
+      console.log('Customer info collected:', this.customerInfo);
     }
 
     isValidEmail(email) {

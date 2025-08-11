@@ -262,10 +262,8 @@ class KnowledgeBaseDB {
       };
 
       if (customerInfo) {
-        intentData.customer_firstname = customerInfo.firstname;
-        intentData.customer_lastname = customerInfo.lastname;
+        intentData.customer_company = customerInfo.company;
         intentData.customer_email = customerInfo.email;
-        intentData.customer_country = customerInfo.country;
       }
 
       const { error } = await this.supabase
