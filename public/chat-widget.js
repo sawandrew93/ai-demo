@@ -953,8 +953,22 @@
         this.ws.send(JSON.stringify({
           type: 'restore_session',
           sessionId: this.sessionId,
+          customerInfo: this.customerInfo,
           timestamp: Date.now()
         }));
+        
+        // Also send customer info separately if available
+        if (this.customerInfo) {
+          setTimeout(() => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+              this.ws.send(JSON.stringify({
+                type: 'customer_info_submitted',
+                sessionId: this.sessionId,
+                customerInfo: this.customerInfo
+              }));
+            }
+          }, 500);
+        }
       }
     }
 
@@ -1325,6 +1339,18 @@
       this.startIdleTimer();
 
       console.log('Customer info collected:', this.customerInfo);
+      
+      // Send customer info to server
+      setTimeout(() => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({
+            type: 'customer_info_submitted',
+            sessionId: this.sessionId,
+            customerInfo: this.customerInfo
+          }));
+          console.log('Sent customer info to server:', this.customerInfo);
+        }
+      }, 1000); // Wait 1 second for WebSocket to be ready
       
       // Show welcome message
       this.addMessage(`Welcome ${company}! How can I help you today?`, 'bot', false);

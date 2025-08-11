@@ -532,12 +532,21 @@ function handleAgentReconnection(agentId, ws, user) {
   return false;
 }
 
-function handleCustomerSessionRestore(ws, sessionId) {
+function handleCustomerSessionRestore(ws, sessionId, customerInfo = null) {
   console.log(`Customer attempting to restore session: ${sessionId}`);
+  if (customerInfo) {
+    console.log('Customer info provided during restore:', customerInfo);
+  }
 
   const conversation = conversations.get(sessionId);
   if (conversation) {
     conversation.customerWs = ws;
+    
+    // Store customer info if provided
+    if (customerInfo) {
+      conversation.customerInfo = customerInfo;
+      console.log('✅ Stored customer info during session restore:', customerInfo);
+    }
     
     // Reset idle timeout on session restore
     setupCustomerIdleTimeout(sessionId);
@@ -567,8 +576,13 @@ function handleCustomerSessionRestore(ws, sessionId) {
       messages: [],
       hasHuman: false,
       agentWs: null,
-      startTime: new Date()
+      startTime: new Date(),
+      customerInfo: customerInfo || null
     });
+
+    if (customerInfo) {
+      console.log('✅ Stored customer info in new session:', customerInfo);
+    }
 
     ws.send(JSON.stringify({
       type: 'session_restored',
@@ -1142,6 +1156,15 @@ async function handleWebSocketMessage(ws, data) {
         }
         await handleHumanRequest(data.sessionId, data.customerInfo);
         break;
+      case 'customer_info_submitted':
+        // Handle customer info submission
+        console.log('🔍 Received customer_info_submitted:', data);
+        const conversation = conversations.get(data.sessionId);
+        if (conversation && data.customerInfo) {
+          conversation.customerInfo = data.customerInfo;
+          console.log('✅ Stored customer info from submission:', data.customerInfo);
+        }
+        break;
       case 'accept_request':
         console.log(`Agent ${data.agentId} accepting request ${data.sessionId}`);
         handleAcceptRequest(data.sessionId, data.agentId);
@@ -1150,7 +1173,7 @@ async function handleWebSocketMessage(ws, data) {
         handleEndChat(data.sessionId);
         break;
       case 'restore_session':
-        handleCustomerSessionRestore(ws, data.sessionId);
+        handleCustomerSessionRestore(ws, data.sessionId, data.customerInfo);
         break;
       case 'handoff_response':
         // Handle customer's response to handoff offer
