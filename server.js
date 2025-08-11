@@ -235,7 +235,8 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       'i want to talk to a person', 'i want to talk to an agent', 'contact human',
       'contact agent', 'contact support', 'customer care', 'real agent', 'talk to rep',
       'speak to rep', 'live rep', 'connect to live agent', 'transfer to agent',
-      'talk to live support', 'can i speak to someone', 'can i talk to someone'
+      'talk to live support', 'can i speak to someone', 'can i talk to someone',
+      'can i talk to support', 'talk to support', 'speak to support', 'connect to support'
     ];
 
     const isHumanRequest = humanRequestKeywords.some(keyword => 
@@ -245,7 +246,7 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     if (isHumanRequest) {
       return {
         type: 'handoff_suggestion',
-        message: "Absolutely! I can connect you with one of our support representatives right away. They'll be able to provide personalized assistance.",
+        message: "Sure! I'll connect you with one of our support representatives right away. They'll be able to provide personalized assistance.",
         reason: "Customer explicitly requested human support"
       };
     }
