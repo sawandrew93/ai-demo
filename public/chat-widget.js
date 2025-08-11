@@ -274,10 +274,7 @@
               <div class="survey-content">
                 <h4 id="survey-title">How was your experience?</h4>
                 <div class="survey-options" id="survey-options"></div>
-                <div class="survey-contact">
-                  <input type="text" id="survey-name" placeholder="Your name (optional)">
-                  <input type="email" id="survey-email" placeholder="Your email (optional)">
-                </div>
+
                 <textarea id="survey-feedback" placeholder="Additional feedback (optional)"></textarea>
                 <div class="survey-buttons">
                   <button id="survey-submit">Submit</button>
@@ -699,20 +696,7 @@
           color: #333;
         }
 
-        .survey-contact {
-          display: flex;
-          gap: 10px;
-          margin-bottom: 15px;
-        }
 
-        .survey-contact input {
-          flex: 1;
-          padding: 8px 12px;
-          border: 1px solid #ddd;
-          border-radius: 6px;
-          font-size: 14px;
-          font-family: inherit;
-        }
 
         .survey-options {
           display: flex;
@@ -1489,8 +1473,6 @@
       document.getElementById('survey-submit').onclick = () => {
         const selectedOption = optionsDiv.querySelector('.survey-option.selected');
         const feedback = document.getElementById('survey-feedback').value;
-        const customerName = document.getElementById('survey-name').value;
-        const customerEmail = document.getElementById('survey-email').value;
 
         if (selectedOption) {
           const rating = parseInt(selectedOption.dataset.value);
@@ -1501,8 +1483,6 @@
               sessionId: data.sessionId,
               rating: rating,
               feedback: feedback,
-              customerName: customerName,
-              customerEmail: customerEmail,
               interactionType: data.interactionType || 'human_agent'
             }));
           }
@@ -1511,16 +1491,12 @@
         }
 
         // Clear form
-        document.getElementById('survey-name').value = '';
-        document.getElementById('survey-email').value = '';
         document.getElementById('survey-feedback').value = '';
         surveyDiv.style.display = 'none';
       };
 
       document.getElementById('survey-skip').onclick = () => {
         // Clear form
-        document.getElementById('survey-name').value = '';
-        document.getElementById('survey-email').value = '';
         document.getElementById('survey-feedback').value = '';
         surveyDiv.style.display = 'none';
       };

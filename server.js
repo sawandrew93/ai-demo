@@ -48,7 +48,7 @@ const customerIdleTimeouts = new Map();
 const chatHistory = [];
 const agentReconnectTimeouts = new Map();
 
-// Agent users (same as before)
+// Agent users 
 const agentUsers = new Map([
   ['agent1', {
     id: 'agent1',
@@ -1211,8 +1211,6 @@ async function handleWebSocketMessage(ws, data) {
           chatHistory[historyIndex].customerSatisfaction = {
             rating: data.rating,
             feedback: data.feedback,
-            customerName: data.customerName,
-            customerEmail: data.customerEmail,
             timestamp: new Date()
           };
           console.log(`Satisfaction response saved for session ${data.sessionId}: ${data.rating}/5`);
@@ -1538,12 +1536,15 @@ async function saveFeedbackToDatabase(data) {
     const conversation = conversations.get(data.sessionId);
     const historyRecord = chatHistory.find(h => h.sessionId === data.sessionId);
     
+    // Use customer info from conversation if available
+    const customerInfo = conversation?.customerInfo;
+    
     const { error } = await supabase
       .from('customer_feedback')
       .insert({
         session_id: data.sessionId,
-        customer_name: data.customerName || null,
-        customer_email: data.customerEmail || null,
+        customer_name: customerInfo?.company || null,
+        customer_email: customerInfo?.email || null,
         rating: data.rating,
         feedback_text: data.feedback || null,
         interaction_type: data.interactionType || 'human_agent',
@@ -1847,12 +1848,7 @@ app.get('/api/intents', verifyToken, async (req, res) => {
     if (req.query.date_to) {
       query = query.lte('created_at', req.query.date_to + 'T23:59:59');
     }
-    if (req.query.customer_country) {
-      query = query.ilike('customer_country', `%${req.query.customer_country}%`);
-    }
-    if (req.query.customer_name) {
-      query = query.or(`customer_firstname.ilike.%${req.query.customer_name}%,customer_lastname.ilike.%${req.query.customer_name}%`);
-    }
+
     if (req.query.customer_email) {
       query = query.ilike('customer_email', `%${req.query.customer_email}%`);
     }
