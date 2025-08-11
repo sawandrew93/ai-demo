@@ -1159,9 +1159,9 @@ async function handleWebSocketMessage(ws, data) {
       case 'customer_info_submitted':
         // Handle customer info submission
         console.log('🔍 Received customer_info_submitted:', data);
-        const conversation = conversations.get(data.sessionId);
-        if (conversation && data.customerInfo) {
-          conversation.customerInfo = data.customerInfo;
+        const infoConversation = conversations.get(data.sessionId);
+        if (infoConversation && data.customerInfo) {
+          infoConversation.customerInfo = data.customerInfo;
           console.log('✅ Stored customer info from submission:', data.customerInfo);
         }
         break;
