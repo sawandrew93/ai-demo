@@ -9,7 +9,7 @@ class EmbeddingService {
   constructor() {
     // Use Gemini Embeddings 001 model
     this.embeddingModel = genAI.getGenerativeModel({ 
-      model: "text-embedding-004" 
+      model: "embedding-001" 
     });
   }
 
