@@ -19,8 +19,12 @@
         .intent-category { padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
         .intent-category.general { background: #e3f2fd; color: #1976d2; }
         .intent-category.pricing { background: #fff3e0; color: #f57c00; }
-        .intent-category.support { background: #e8f5e8; color: #2e7d32; }
-        .intent-category.trial { background: #f3e5f5; color: #7b1fa2; }
+        .intent-category.product { background: #e8f5e8; color: #2e7d32; }
+        .intent-category.sales { background: #f3e5f5; color: #7b1fa2; }
+        .intent-category.support { background: #ffebee; color: #c62828; }
+        .intent-category.technical { background: #e0f2f1; color: #00695c; }
+        .intent-category.billing { background: #fce4ec; color: #ad1457; }
+        .intent-category.escalation { background: #fff8e1; color: #ff8f00; }
         .response-type { padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
         .response-type.ai_response { background: #e8f5e8; color: #2e7d32; }
         .response-type.handoff_suggestion { background: #fff3e0; color: #f57c00; }
@@ -59,8 +63,12 @@
                     <option value="">All Categories</option>
                     <option value="general">General</option>
                     <option value="pricing">Pricing</option>
+                    <option value="product">Product</option>
+                    <option value="sales">Sales</option>
                     <option value="support">Support</option>
-                    <option value="trial">Trial</option>
+                    <option value="technical">Technical</option>
+                    <option value="billing">Billing</option>
+                    <option value="escalation">Escalation</option>
                 </select>
             </div>
             <div class="filter-group">
@@ -112,6 +120,10 @@
                 <div class="stat-number" id="noKnowledge">-</div>
                 <div class="stat-label">No Knowledge Found</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-number" id="avgConfidence">-</div>
+                <div class="stat-label">Avg Confidence</div>
+            </div>
         </div>
 
         <div class="intents-table">
@@ -120,7 +132,7 @@
                     <tr>
                         <th>Date</th>
                         <th>Customer Message</th>
-                        <th>Intent</th>
+                        <th>Intent Type</th>
                         <th>Category</th>
                         <th>Confidence</th>
                         <th>Response Type</th>
@@ -198,7 +210,7 @@
                             ${intent.customer_message}
                         </div>
                     </td>
-                    <td>${intent.detected_intent || '-'}</td>
+                    <td>${formatIntentType(intent.detected_intent)}</td>
                     <td>
                         <span class="intent-category ${intent.intent_category || 'general'}">
                             ${intent.intent_category || 'general'}
@@ -226,11 +238,25 @@
             const aiResponses = intents.filter(i => i.response_type === 'ai_response').length;
             const handoffSuggestions = intents.filter(i => i.response_type === 'handoff_suggestion').length;
             const noKnowledge = intents.filter(i => i.response_type === 'no_knowledge').length;
+            
+            // Log top intents for debugging
+            const intentCounts = {};
+            intents.forEach(i => {
+                const intent = i.detected_intent || 'unknown';
+                intentCounts[intent] = (intentCounts[intent] || 0) + 1;
+            });
+            console.log('Top intents:', Object.entries(intentCounts).sort((a,b) => b[1] - a[1]).slice(0, 5));
 
             document.getElementById('totalIntents').textContent = total;
             document.getElementById('aiResponses').textContent = aiResponses;
             document.getElementById('handoffSuggestions').textContent = handoffSuggestions;
             document.getElementById('noKnowledge').textContent = noKnowledge;
+            
+            // Calculate average confidence
+            const confidenceScores = intents.filter(i => i.confidence_score).map(i => i.confidence_score);
+            const avgConf = confidenceScores.length > 0 ? 
+                (confidenceScores.reduce((a, b) => a + b, 0) / confidenceScores.length * 100).toFixed(1) + '%' : '-';
+            document.getElementById('avgConfidence').textContent = avgConf;
         }
 
         function getConfidenceClass(score) {
@@ -246,6 +272,23 @@
                 case 'handoff_suggestion': return 'Handoff Suggested';
                 case 'no_knowledge': return 'No Knowledge';
                 default: return type;
+            }
+        }
+        
+        function formatIntentType(intent) {
+            if (!intent) return '-';
+            switch(intent) {
+                case 'pricing_inquiry': return 'Pricing Inquiry';
+                case 'product_inquiry': return 'Product Inquiry';
+                case 'demo_request': return 'Demo Request';
+                case 'technical_support': return 'Technical Support';
+                case 'implementation_help': return 'Implementation Help';
+                case 'account_management': return 'Account Management';
+                case 'complaint': return 'Complaint';
+                case 'human_request': return 'Human Request';
+                case 'general_inquiry': return 'General Inquiry';
+                case 'greeting': return 'Greeting';
+                default: return intent.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             }
         }
 

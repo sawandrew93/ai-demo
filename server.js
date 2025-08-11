@@ -191,9 +191,59 @@ async function analyzeHandoffIntent(message, conversationHistory = []) {
   }
 }
 
+// ========== ENHANCED INTENT CLASSIFICATION ========== //
+function classifyIntent(message) {
+  const msg = message.toLowerCase();
+  
+  // Pricing & Cost inquiries
+  if (/\b(price|pricing|cost|expensive|cheap|budget|quote|estimate)\b/.test(msg)) {
+    return { intent: 'pricing_inquiry', category: 'pricing', confidence: 0.9 };
+  }
+  
+  // Product & Service inquiries
+  if (/\b(what do you|services|products|solutions|features|capabilities)\b/.test(msg)) {
+    return { intent: 'product_inquiry', category: 'product', confidence: 0.8 };
+  }
+  
+  // Demo & Trial requests
+  if (/\b(demo|trial|test|try|show me|preview)\b/.test(msg)) {
+    return { intent: 'demo_request', category: 'sales', confidence: 0.9 };
+  }
+  
+  // Technical Support
+  if (/\b(help|support|problem|issue|error|bug|not working|broken)\b/.test(msg)) {
+    return { intent: 'technical_support', category: 'support', confidence: 0.8 };
+  }
+  
+  // Implementation & Integration
+  if (/\b(implement|integration|setup|install|configure|deploy)\b/.test(msg)) {
+    return { intent: 'implementation_help', category: 'technical', confidence: 0.8 };
+  }
+  
+  // Account & Billing
+  if (/\b(account|billing|payment|subscription|invoice|cancel)\b/.test(msg)) {
+    return { intent: 'account_management', category: 'billing', confidence: 0.8 };
+  }
+  
+  // Complaints
+  if (/\b(complain|disappointed|frustrated|angry|terrible|awful|bad)\b/.test(msg)) {
+    return { intent: 'complaint', category: 'support', confidence: 0.7 };
+  }
+  
+  // Human agent requests
+  if (/\b(human|agent|person|representative|talk to|speak with)\b/.test(msg)) {
+    return { intent: 'human_request', category: 'escalation', confidence: 0.9 };
+  }
+  
+  return { intent: 'general_inquiry', category: 'general', confidence: 0.5 };
+}
+
 // ========== ENHANCED AI RESPONSE GENERATION ========== //
 async function generateAIResponse(userMessage, conversationHistory = []) {
   try {
+    // Classify intent first
+    const intentClassification = classifyIntent(userMessage);
+    
     // Handle greeting messages
     const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
     const isGreeting = greetings.some(greeting => 
@@ -204,7 +254,9 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       return {
         type: 'ai_response',
         message: "Hi there! 👋 How can I help you today?",
-        sources: []
+        sources: [],
+        intent: 'greeting',
+        category: 'general'
       };
     }
 
@@ -340,7 +392,10 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       return {
         type: 'handoff_suggestion',
         message: "I don't have specific information about that in my knowledge base. Would you like me to connect you with one of our support representatives who can provide more detailed assistance?",
-        reason: "No relevant knowledge found for this specific question"
+        reason: "No relevant knowledge found for this specific question",
+        intent: intentClassification.intent,
+        category: intentClassification.category,
+        confidence: intentClassification.confidence
       };
     }
 
@@ -360,6 +415,10 @@ Answer based strictly on the provided information.`;
     const result = await model.generateContent(context);
     const responseText = result.response.text();
 
+    // Calculate enhanced confidence score
+    const avgSimilarity = relevantResults.reduce((sum, r) => sum + r.similarity, 0) / relevantResults.length;
+    const enhancedConfidence = Math.min(intentClassification.confidence + (avgSimilarity * 0.3), 1.0);
+    
     return {
       type: 'ai_response',
       message: responseText,
@@ -367,8 +426,9 @@ Answer based strictly on the provided information.`;
         content: item.content.substring(0, 100) + '...',
         similarity: item.similarity
       })),
-      intent: 'general',
-      category: 'general'
+      intent: intentClassification.intent,
+      category: intentClassification.category,
+      confidence: enhancedConfidence
     };
 
   } catch (error) {
@@ -699,7 +759,7 @@ async function handleCustomerMessage(ws, sessionId, message) {
         message,
         aiResponse.intent || 'unknown',
         aiResponse.category || 'general',
-        0,
+        aiResponse.confidence || 0,
         [],
         aiResponse.type,
         conversation.customerInfo
@@ -730,7 +790,7 @@ async function handleCustomerMessage(ws, sessionId, message) {
         message,
         aiResponse.intent || 'general',
         aiResponse.category || 'general',
-        aiResponse.sources?.[0]?.similarity || 0,
+        aiResponse.confidence || aiResponse.sources?.[0]?.similarity || 0,
         aiResponse.sources || [],
         'ai_response',
         conversation.customerInfo
