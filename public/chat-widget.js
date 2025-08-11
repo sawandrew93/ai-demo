@@ -25,6 +25,11 @@
       this.customerInfo = null;
       this.hasCollectedInfo = false;
 
+      // For testing - clear localStorage to always show dialog
+      // Remove this in production
+      localStorage.removeItem('chat_customer_info');
+      localStorage.removeItem('chat_info_collected');
+
       this.init();
     }
 
@@ -68,9 +73,12 @@
           this.customerInfo = JSON.parse(savedInfo);
           this.hasCollectedInfo = true;
           console.log('Loaded customer info:', this.customerInfo);
+        } else {
+          console.log('No customer info found, will show dialog');
         }
       } catch (error) {
         console.error('Error loading customer info:', error);
+        this.hasCollectedInfo = false;
       }
     }
 
@@ -129,10 +137,17 @@
     init() {
       this.createWidget();
       this.loadCustomerInfo();
+      
+      // Always show the chat interface first
+      this.restoreMessages();
+      
       if (!this.hasCollectedInfo) {
-        this.showCustomerInfoDialog();
+        // Show customer info dialog immediately after widget is created
+        setTimeout(() => {
+          this.showCustomerInfoDialog();
+        }, 100);
       } else {
-        this.restoreMessages();
+        // Only connect WebSocket if we have customer info
         this.connectWebSocket();
         this.startIdleTimer();
 
@@ -888,6 +903,13 @@
       }
 
       console.log('Connecting to WebSocket:', wsUrl, 'Session:', this.sessionId);
+      console.log('Customer info available:', !!this.customerInfo);
+      
+      if (!this.customerInfo) {
+        console.log('No customer info - delaying WebSocket connection');
+        return;
+      }
+      
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
@@ -1102,6 +1124,13 @@
       const window = document.getElementById('chat-window');
       this.isOpen = !this.isOpen;
       window.style.display = this.isOpen ? 'flex' : 'none';
+      
+      // If opening chat and no customer info collected, show dialog
+      if (this.isOpen && !this.hasCollectedInfo) {
+        setTimeout(() => {
+          this.showCustomerInfoDialog();
+        }, 200);
+      }
     }
 
 
@@ -1252,7 +1281,13 @@
     }
 
     showCustomerInfoDialog() {
-      document.getElementById('customer-info-dialog').style.display = 'block';
+      const dialog = document.getElementById('customer-info-dialog');
+      if (dialog) {
+        dialog.style.display = 'block';
+        console.log('Customer info dialog shown');
+      } else {
+        console.error('Customer info dialog not found');
+      }
     }
 
     hideCustomerInfoDialog() {
@@ -1261,8 +1296,10 @@
     }
 
     clearCustomerForm() {
-      document.getElementById('customer-company').value = '';
-      document.getElementById('customer-email').value = '';
+      const companyField = document.getElementById('customer-company');
+      const emailField = document.getElementById('customer-email');
+      if (companyField) companyField.value = '';
+      if (emailField) emailField.value = '';
     }
 
     submitCustomerInfo() {
@@ -1284,12 +1321,14 @@
       this.saveCustomerInfo();
       this.hideCustomerInfoDialog();
 
-      // Now initialize the chat
-      this.restoreMessages();
+      // Now initialize the WebSocket connection
       this.connectWebSocket();
       this.startIdleTimer();
 
       console.log('Customer info collected:', this.customerInfo);
+      
+      // Show welcome message
+      this.addMessage(`Welcome ${company}! How can I help you today?`, 'bot', false);
     }
 
     isValidEmail(email) {
