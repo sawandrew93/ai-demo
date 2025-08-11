@@ -608,7 +608,8 @@ async function handleCustomerMessage(ws, sessionId, message) {
       messages: [],
       hasHuman: false,
       agentWs: null,
-      startTime: new Date()
+      startTime: new Date(),
+      customerInfo: null
     });
     setupCustomerTimeout(sessionId);
   }
@@ -1012,10 +1013,12 @@ async function handleHumanRequest(sessionId, customerInfo = null) {
     return;
   }
 
-  // Store customer info if provided
-  if (customerInfo) {
-    console.log('✅ Customer info provided:', customerInfo);
-    conversation.customerInfo = customerInfo;
+  // Use provided customer info or existing stored info
+  const finalCustomerInfo = customerInfo || conversation.customerInfo;
+  
+  if (finalCustomerInfo) {
+    console.log('✅ Using customer info:', finalCustomerInfo);
+    conversation.customerInfo = finalCustomerInfo;
     
     // Log customer intent with info
     await knowledgeDB.logCustomerIntent(
@@ -1026,11 +1029,11 @@ async function handleHumanRequest(sessionId, customerInfo = null) {
       0,
       [],
       'human_request',
-      customerInfo
+      finalCustomerInfo
     );
     console.log('✅ Customer intent logged with info');
   } else {
-    console.log('⚠️ No customer info provided');
+    console.log('⚠️ No customer info available');
     // Log human request without customer info
     await knowledgeDB.logCustomerIntent(
       sessionId,
@@ -1103,6 +1106,14 @@ async function handleWebSocketMessage(ws, data) {
         break;
       case 'request_human':
         console.log('🔍 Received request_human message:', data);
+        // Store customer info in conversation if provided
+        if (data.customerInfo) {
+          const conversation = conversations.get(data.sessionId);
+          if (conversation) {
+            conversation.customerInfo = data.customerInfo;
+            console.log('✅ Stored customer info in conversation:', data.customerInfo);
+          }
+        }
         await handleHumanRequest(data.sessionId, data.customerInfo);
         break;
       case 'accept_request':
@@ -1118,14 +1129,8 @@ async function handleWebSocketMessage(ws, data) {
       case 'handoff_response':
         // Handle customer's response to handoff offer
         if (data.accepted) {
-          // Don't directly connect, let client show customer info dialog
-          const conversation = conversations.get(data.sessionId);
-          if (conversation && conversation.customerWs) {
-            conversation.customerWs.send(JSON.stringify({
-              type: 'show_customer_info_dialog',
-              sessionId: data.sessionId
-            }));
-          }
+          // Directly connect using stored customer info
+          await handleHumanRequest(data.sessionId, null);
         } else {
           const conversation = conversations.get(data.sessionId);
           if (conversation && conversation.customerWs) {
