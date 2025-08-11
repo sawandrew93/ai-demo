@@ -293,31 +293,53 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       console.log(`📝 Top result preview: ${knowledgeResults[0].content.substring(0, 150)}...`);
     }
 
-    // Check if knowledge results are relevant (not just high similarity)
+    // Check if knowledge results are relevant to the specific question
     let relevantResults = [];
     if (knowledgeResults.length > 0) {
-      // Filter out results that seem irrelevant to the question
-      const questionWords = userMessage.toLowerCase().split(' ');
-      const importantWords = questionWords.filter(word => 
-        word.length > 3 && !['with', 'talk', 'speak', 'can', 'could', 'would', 'should'].includes(word)
+      // For subscription/billing questions, check if results actually contain relevant info
+      const subscriptionKeywords = ['subscription', 'unsubscribe', 'cancel', 'billing', 'payment', 'annual', 'monthly', 'plan', 'account'];
+      const isSubscriptionQuestion = subscriptionKeywords.some(keyword => 
+        userMessage.toLowerCase().includes(keyword)
       );
       
-      relevantResults = knowledgeResults.filter(result => {
-        const content = result.content.toLowerCase();
-        // Check if the result content relates to the question context
-        const hasRelevantContext = importantWords.some(word => 
-          content.includes(word)
+      if (isSubscriptionQuestion) {
+        // For subscription questions, require higher relevance
+        relevantResults = knowledgeResults.filter(result => {
+          const content = result.content.toLowerCase();
+          const hasSubscriptionContent = subscriptionKeywords.some(keyword => 
+            content.includes(keyword)
+          );
+          return hasSubscriptionContent && result.similarity > 0.7;
+        });
+      } else {
+        // For other questions, use general relevance check
+        const questionWords = userMessage.toLowerCase().split(' ');
+        const importantWords = questionWords.filter(word => 
+          word.length > 3 && !['with', 'talk', 'speak', 'can', 'could', 'would', 'should', 'how', 'what', 'when', 'where'].includes(word)
         );
-        return hasRelevantContext && result.similarity > 0.6; // Increased threshold
-      });
+        
+        relevantResults = knowledgeResults.filter(result => {
+          const content = result.content.toLowerCase();
+          const hasRelevantContext = importantWords.some(word => 
+            content.includes(word)
+          );
+          return hasRelevantContext && result.similarity > 0.6;
+        });
+      }
     }
 
     // If no relevant knowledge found for question, suggest human handoff
     if (relevantResults.length === 0) {
+      console.log(`🔄 No relevant results found for: "${userMessage}"`);
+      console.log(`📊 Original results: ${knowledgeResults.length}, Filtered: ${relevantResults.length}`);
+      if (knowledgeResults.length > 0) {
+        console.log(`📝 Top result was: ${knowledgeResults[0].content.substring(0, 150)}...`);
+        console.log(`📊 Top similarity: ${knowledgeResults[0].similarity}`);
+      }
       return {
         type: 'handoff_suggestion',
         message: "I don't have specific information about that in my knowledge base. Would you like me to connect you with one of our support representatives who can provide more detailed assistance?",
-        reason: "No relevant knowledge found"
+        reason: "No relevant knowledge found for this specific question"
       };
     }
 

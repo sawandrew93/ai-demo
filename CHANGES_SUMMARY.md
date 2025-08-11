@@ -169,9 +169,10 @@ This document details the changes made to remove name and email requests from th
 
 ## Next Steps
 
-1. **Run the Database Update:**
-   - Execute `update-intents-schema.sql` in your Supabase SQL editor
-   - This ensures the database schema supports the new data flow
+1. **Run the Database Setup:**
+   - Execute `setup-complete-database.sql` in your Supabase SQL editor
+   - This handles both new setups and existing database migrations
+   - The script is now idempotent and safe to run multiple times
 
 2. **Test the Changes:**
    - Start a new chat session
@@ -188,5 +189,24 @@ This document details the changes made to remove name and email requests from th
 1. `public/chat-widget.js` - Removed feedback form fields
 2. `public/intents-dashboard.html` - Updated table structure and filters  
 3. `server.js` - Updated API endpoints and feedback handling
-4. `update-intents-schema.sql` - Database schema updates (new file)
+4. `setup-complete-database.sql` - Updated with new schema (modified)
 5. `CHANGES_SUMMARY.md` - This documentation (new file)
+
+## Additional Fixes Applied
+
+### Handoff Issue Resolution
+- **Problem:** AI was not handing off to human agents even when it couldn't properly answer questions
+- **Root Cause:** The relevance filtering was too lenient, allowing irrelevant results to pass through
+- **Solution:** 
+  - Improved relevance detection for subscription/billing questions
+  - Added specific keyword matching for subscription-related queries
+  - Increased similarity threshold for subscription questions (0.7 vs 0.6)
+  - Added debug logging to track handoff decisions
+
+### Database Setup Consolidation
+- **Problem:** Separate migration files were needed for different environments
+- **Solution:** 
+  - Consolidated all schema changes into `setup-complete-database.sql`
+  - Added migration logic for existing databases
+  - Made the script idempotent (safe to run multiple times)
+  - Removed the separate `update-intents-schema.sql` file

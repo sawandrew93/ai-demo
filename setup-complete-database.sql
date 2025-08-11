@@ -40,10 +40,8 @@ CREATE TABLE IF NOT EXISTS customer_intents (
   confidence_score DECIMAL(3,2),
   matched_documents JSONB DEFAULT '[]',
   response_type VARCHAR(50) NOT NULL,
-  customer_firstname VARCHAR(255),
-  customer_lastname VARCHAR(255),
   customer_email VARCHAR(255),
-  customer_country VARCHAR(255),
+  customer_company VARCHAR(255),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -92,7 +90,32 @@ CREATE INDEX IF NOT EXISTS customer_feedback_session_idx ON customer_feedback(se
 CREATE INDEX IF NOT EXISTS customer_feedback_created_idx ON customer_feedback(created_at);
 CREATE INDEX IF NOT EXISTS customer_intents_session_idx ON customer_intents(session_id);
 CREATE INDEX IF NOT EXISTS customer_intents_created_idx ON customer_intents(created_at);
+CREATE INDEX IF NOT EXISTS customer_intents_email_idx ON customer_intents(customer_email);
+CREATE INDEX IF NOT EXISTS customer_intents_company_idx ON customer_intents(customer_company);
 CREATE INDEX IF NOT EXISTS customer_attachments_session_idx ON customer_attachments(session_id);
+
+-- Migration for existing databases: Update customer_intents table structure
+-- This section handles updating existing tables to the new schema
+DO $$ 
+BEGIN
+    -- Add customer_company column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'customer_intents' 
+                   AND column_name = 'customer_company') THEN
+        ALTER TABLE customer_intents ADD COLUMN customer_company VARCHAR(255);
+    END IF;
+    
+    -- Ensure customer_email column exists (should already exist)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'customer_intents' 
+                   AND column_name = 'customer_email') THEN
+        ALTER TABLE customer_intents ADD COLUMN customer_email VARCHAR(255);
+    END IF;
+END $$;
+
+-- Add comments for documentation
+COMMENT ON COLUMN customer_intents.customer_email IS 'Email address collected from customer at chat start';
+COMMENT ON COLUMN customer_intents.customer_company IS 'Company name collected from customer at chat start';
 
 -- Enable Row Level Security (optional - uncomment if needed)
 -- ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
