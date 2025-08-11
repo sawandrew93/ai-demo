@@ -105,28 +105,55 @@ async function generateEmbedding(text) {
   }
 }
 
+// Query expansion for better semantic matching
+function expandQuery(query) {
+  const expansions = {
+    'make love': ['romance', 'dating', 'relationship', 'intimate'],
+    'office romance': ['workplace dating', 'employee relationship', 'office dating'],
+    'dating': ['romance', 'relationship', 'romantic'],
+    'love': ['romance', 'dating', 'relationship'],
+    'relationship': ['dating', 'romance', 'romantic'],
+    'price': ['cost', 'pricing', 'expensive', 'budget'],
+    'help': ['support', 'assistance', 'problem'],
+    'setup': ['installation', 'configuration', 'implementation']
+  };
+  
+  let expandedQuery = query.toLowerCase();
+  
+  for (const [key, synonyms] of Object.entries(expansions)) {
+    if (expandedQuery.includes(key)) {
+      expandedQuery += ' ' + synonyms.join(' ');
+    }
+  }
+  
+  return expandedQuery;
+}
+
 async function searchKnowledgeBase(query, limit = 5) {
   try {
     console.log('🔍 Searching knowledge base for:', query);
     
-    // Generate embedding for the query
-    const queryEmbedding = await generateEmbedding(query);
+    // Expand query for better semantic matching
+    const expandedQuery = expandQuery(query);
+    console.log('🔍 Expanded query:', expandedQuery);
+    
+    // Generate embedding for the expanded query
+    const queryEmbedding = await generateEmbedding(expandedQuery);
     console.log('✅ Generated embedding, length:', queryEmbedding.length);
 
-    // Search using the knowledge base service
-    const results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, SIMILARITY_THRESHOLD, limit);
+    // Search using the knowledge base service with lower threshold first
+    let results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, SIMILARITY_THRESHOLD, limit);
 
-    console.log(`📊 Found ${results?.length || 0} results with threshold ${SIMILARITY_THRESHOLD}`);
+    // If no results, try with lower threshold
+    if (!results || results.length === 0) {
+      console.log('🔍 No results with standard threshold, trying lower threshold...');
+      results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.3, limit);
+    }
+
+    console.log(`📊 Found ${results?.length || 0} results`);
     if (results && results.length > 0) {
       console.log('📝 Top result similarity:', results[0].similarity);
       console.log('📝 Top result:', results[0].content?.substring(0, 100) + '...');
-    } else {
-      // Try with lower threshold to see what's available
-      const fallbackResults = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.1, 3);
-      console.log('🔍 Fallback results (lower threshold):', fallbackResults?.length || 0);
-      if (fallbackResults && fallbackResults.length > 0) {
-        console.log('📝 Best similarity score:', fallbackResults[0].similarity);
-      }
     }
 
     return results || [];
@@ -346,42 +373,29 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       console.log(`📝 Top result preview: ${knowledgeResults[0].content.substring(0, 150)}...`);
     }
 
-    // Check if knowledge results are relevant to the specific question
+    // Improved relevance checking with lower thresholds
     let relevantResults = [];
     if (knowledgeResults.length > 0) {
-      // For subscription/billing questions, check if results actually contain relevant info
-      const subscriptionKeywords = ['subscription', 'unsubscribe', 'cancel', 'billing', 'payment', 'annual', 'monthly', 'plan', 'account'];
-      const isSubscriptionQuestion = subscriptionKeywords.some(keyword => 
-        userMessage.toLowerCase().includes(keyword)
-      );
+      // Use intent classification to determine relevance threshold
+      const minSimilarity = intentClassification.confidence > 0.8 ? 0.25 : 0.3;
       
-      if (isSubscriptionQuestion) {
-        // For subscription questions, require higher relevance
-        relevantResults = knowledgeResults.filter(result => {
-          const content = result.content.toLowerCase();
-          const hasSubscriptionContent = subscriptionKeywords.some(keyword => 
-            content.includes(keyword)
-          );
-          return hasSubscriptionContent && result.similarity > 0.7;
-        });
-      } else {
-        // For other questions, use general relevance check
-        const questionWords = userMessage.toLowerCase().split(' ');
-        const importantWords = questionWords.filter(word => 
-          word.length > 3 && !['with', 'talk', 'speak', 'can', 'could', 'would', 'should', 'how', 'what', 'when', 'where'].includes(word)
-        );
-        
-        relevantResults = knowledgeResults.filter(result => {
-          const content = result.content.toLowerCase();
-          const hasRelevantContext = importantWords.some(word => 
-            content.includes(word)
-          );
-          return hasRelevantContext && result.similarity > 0.6;
-        });
-      }
+      relevantResults = knowledgeResults.filter(result => {
+        return result.similarity > minSimilarity;
+      });
+      
+      console.log(`📊 Filtered to ${relevantResults.length} relevant results (min similarity: ${minSimilarity})`);
     }
 
-    // If no relevant knowledge found for question, suggest human handoff
+    // If no relevant knowledge found, try one more search with original query
+    if (relevantResults.length === 0 && knowledgeResults.length === 0) {
+      console.log(`🔄 No results found, trying original query: "${userMessage}"`);
+      const originalResults = await searchKnowledgeBase(userMessage, 3);
+      if (originalResults.length > 0) {
+        relevantResults = originalResults.filter(r => r.similarity > 0.2);
+      }
+    }
+    
+    // If still no relevant knowledge found, suggest human handoff
     if (relevantResults.length === 0) {
       console.log(`🔄 No relevant results found for: "${userMessage}"`);
       console.log(`📊 Original results: ${knowledgeResults.length}, Filtered: ${relevantResults.length}`);
@@ -402,15 +416,15 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     // Use relevant knowledge base results
     console.log(`📋 Using ${relevantResults.length} relevant knowledge base results for: "${userMessage}"`);
 
-    // Generate response using ONLY relevant knowledge base information
-    const context = `You are a helpful assistant. Answer the customer's question using ONLY the information provided below. Do not add any information that is not explicitly stated in the knowledge base.
+    // Generate response using relevant knowledge base information with better context
+    const context = `You are a helpful company assistant. Answer the customer's question using the information provided below. Be direct and helpful.
 
-Knowledge base information:
+Relevant company information:
 ${relevantResults.map(item => `- ${item.content}`).join('\n')}
 
 Customer question: "${userMessage}"
 
-Answer based strictly on the provided information.`;
+Provide a clear, helpful answer based on the company information above. If the question uses different words but asks about the same topic (like "make love" vs "romance"), understand the intent and answer appropriately.`;
 
     const result = await model.generateContent(context);
     const responseText = result.response.text();
