@@ -223,7 +223,11 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     }
 
     // Handle explicit human support requests
-    const humanRequestKeywords = ['talk with support', 'talk with human', 'speak with agent', 'connect with human', 'human support', 'live agent', 'real person'];
+    const humanRequestKeywords = [
+      'talk with support', 'talk with human', 'speak with agent', 'connect with human', 
+      'human support', 'live agent', 'real person', 'support assistant', 'customer support',
+      'can i talk with', 'speak to someone', 'talk to someone', 'human agent', 'representative'
+    ];
     const isHumanRequest = humanRequestKeywords.some(keyword => 
       userMessage.toLowerCase().includes(keyword)
     );
@@ -231,7 +235,7 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     if (isHumanRequest) {
       return {
         type: 'handoff_suggestion',
-        message: "Sure! I'll connect you with one of our support agents right away.",
+        message: "Absolutely! I can connect you with one of our support representatives right away. They'll be able to provide personalized assistance.",
         reason: "Customer explicitly requested human support"
       };
     }
@@ -284,13 +288,17 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     if (knowledgeResults.length > 0) {
       // Filter out results that seem irrelevant to the question
       const questionWords = userMessage.toLowerCase().split(' ');
+      const importantWords = questionWords.filter(word => 
+        word.length > 3 && !['with', 'talk', 'speak', 'can', 'could', 'would', 'should'].includes(word)
+      );
+      
       relevantResults = knowledgeResults.filter(result => {
         const content = result.content.toLowerCase();
         // Check if the result content relates to the question context
-        const hasRelevantContext = questionWords.some(word => 
-          word.length > 3 && content.includes(word)
+        const hasRelevantContext = importantWords.some(word => 
+          content.includes(word)
         );
-        return hasRelevantContext && result.similarity > 0.5;
+        return hasRelevantContext && result.similarity > 0.6; // Increased threshold
       });
     }
 
@@ -298,7 +306,7 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     if (relevantResults.length === 0) {
       return {
         type: 'handoff_suggestion',
-        message: "I don't have specific information about that in my knowledge base. Would you like to connect with human support for more detailed assistance?",
+        message: "I don't have specific information about that in my knowledge base. Would you like me to connect you with one of our support representatives who can provide more detailed assistance?",
         reason: "No relevant knowledge found"
       };
     }
