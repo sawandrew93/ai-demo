@@ -82,6 +82,10 @@
             </div>
 
             <div class="filter-group">
+                <label>Company</label>
+                <input type="text" id="companyFilter" placeholder="Enter company">
+            </div>
+            <div class="filter-group">
                 <label>Customer Email</label>
                 <input type="text" id="emailFilter" placeholder="Enter email">
             </div>
@@ -120,12 +124,13 @@
                         <th>Category</th>
                         <th>Confidence</th>
                         <th>Response Type</th>
+                        <th>Company</th>
                         <th>Email</th>
                         <th>Session</th>
                     </tr>
                 </thead>
                 <tbody id="intentsTableBody">
-                    <tr><td colspan="8" class="loading">Loading intents...</td></tr>
+                    <tr><td colspan="9" class="loading">Loading intents...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -147,12 +152,14 @@
                 const responseFilter = document.getElementById('responseFilter').value;
                 const dateFrom = document.getElementById('dateFrom').value;
                 const dateTo = document.getElementById('dateTo').value;
+                const companyFilter = document.getElementById('companyFilter').value;
                 const emailFilter = document.getElementById('emailFilter').value;
 
                 if (categoryFilter) params.append('intent_category', categoryFilter);
                 if (responseFilter) params.append('response_type', responseFilter);
                 if (dateFrom) params.append('date_from', dateFrom);
                 if (dateTo) params.append('date_to', dateTo);
+                if (companyFilter) params.append('customer_company', companyFilter);
                 if (emailFilter) params.append('customer_email', emailFilter);
 
                 const response = await fetch(`/api/intents?${params}`, {
@@ -179,7 +186,7 @@
             const tbody = document.getElementById('intentsTableBody');
             
             if (intents.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="no-data">No intents found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="no-data">No intents found</td></tr>';
                 return;
             }
 
@@ -207,6 +214,7 @@
                             ${formatResponseType(intent.response_type)}
                         </span>
                     </td>
+                    <td>${intent.customer_company || '-'}</td>
                     <td>${intent.customer_email || '-'}</td>
                     <td style="font-family: monospace; font-size: 0.8em;">${intent.session_id.substring(0, 12)}...</td>
                 </tr>

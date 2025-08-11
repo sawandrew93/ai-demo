@@ -677,7 +677,8 @@ async function handleCustomerMessage(ws, sessionId, message) {
     const aiResponse = await generateAIResponse(message, conversation.messages);
 
     if (aiResponse.type === 'handoff_suggestion' || aiResponse.type === 'no_knowledge') {
-      // Log customer intent
+      // Log customer intent with customer info
+      console.log('🔍 Logging handoff intent with customer info:', conversation.customerInfo);
       await knowledgeDB.logCustomerIntent(
         sessionId,
         message,
@@ -685,7 +686,8 @@ async function handleCustomerMessage(ws, sessionId, message) {
         aiResponse.category || 'general',
         0,
         [],
-        aiResponse.type
+        aiResponse.type,
+        conversation.customerInfo
       );
 
       // Show AI response directly in handoff popup
@@ -706,7 +708,8 @@ async function handleCustomerMessage(ws, sessionId, message) {
         timestamp: new Date()
       });
 
-      // Log customer intent
+      // Log customer intent with customer info
+      console.log('🔍 Logging AI response intent with customer info:', conversation.customerInfo);
       await knowledgeDB.logCustomerIntent(
         sessionId,
         message,
@@ -714,7 +717,8 @@ async function handleCustomerMessage(ws, sessionId, message) {
         aiResponse.category || 'general',
         aiResponse.sources?.[0]?.similarity || 0,
         aiResponse.sources || [],
-        'ai_response'
+        'ai_response',
+        conversation.customerInfo
       );
 
       ws.send(JSON.stringify({
@@ -1871,6 +1875,9 @@ app.get('/api/intents', verifyToken, async (req, res) => {
       query = query.lte('created_at', req.query.date_to + 'T23:59:59');
     }
 
+    if (req.query.customer_company) {
+      query = query.ilike('customer_company', `%${req.query.customer_company}%`);
+    }
     if (req.query.customer_email) {
       query = query.ilike('customer_email', `%${req.query.customer_email}%`);
     }

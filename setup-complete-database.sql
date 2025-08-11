@@ -103,6 +103,7 @@ BEGIN
                    WHERE table_name = 'customer_intents' 
                    AND column_name = 'customer_company') THEN
         ALTER TABLE customer_intents ADD COLUMN customer_company VARCHAR(255);
+        RAISE NOTICE 'Added customer_company column to customer_intents table';
     END IF;
     
     -- Ensure customer_email column exists (should already exist)
@@ -110,6 +111,32 @@ BEGIN
                    WHERE table_name = 'customer_intents' 
                    AND column_name = 'customer_email') THEN
         ALTER TABLE customer_intents ADD COLUMN customer_email VARCHAR(255);
+        RAISE NOTICE 'Added customer_email column to customer_intents table';
+    END IF;
+    
+    -- Remove old unused columns if they exist (optional)
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'customer_intents' 
+               AND column_name = 'customer_firstname') THEN
+        -- You can uncomment the next line to remove the old column
+        -- ALTER TABLE customer_intents DROP COLUMN customer_firstname;
+        RAISE NOTICE 'customer_firstname column exists (not removed - uncomment to remove)';
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'customer_intents' 
+               AND column_name = 'customer_lastname') THEN
+        -- You can uncomment the next line to remove the old column
+        -- ALTER TABLE customer_intents DROP COLUMN customer_lastname;
+        RAISE NOTICE 'customer_lastname column exists (not removed - uncomment to remove)';
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'customer_intents' 
+               AND column_name = 'customer_country') THEN
+        -- You can uncomment the next line to remove the old column
+        -- ALTER TABLE customer_intents DROP COLUMN customer_country;
+        RAISE NOTICE 'customer_country column exists (not removed - uncomment to remove)';
     END IF;
 END $$;
 
