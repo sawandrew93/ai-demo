@@ -115,7 +115,14 @@ function expandQuery(query) {
     'relationship': ['dating', 'romance', 'romantic'],
     'price': ['cost', 'pricing', 'expensive', 'budget'],
     'help': ['support', 'assistance', 'problem'],
-    'setup': ['installation', 'configuration', 'implementation']
+    'setup': ['installation', 'configuration', 'implementation'],
+    'leaves': ['leave', 'vacation', 'annual leave', 'sick leave', 'medical leave', 'time off', 'holiday'],
+    'leave': ['leaves', 'vacation', 'annual', 'sick', 'medical', 'time off', 'holiday', 'absence'],
+    'vacation': ['leave', 'annual leave', 'time off', 'holiday'],
+    'sick': ['medical', 'illness', 'sick leave', 'medical leave'],
+    'annual': ['yearly', 'vacation', 'annual leave'],
+    'time off': ['leave', 'vacation', 'absence', 'holiday'],
+    'types of': ['what', 'available', 'allowed', 'different', 'kinds of']
   };
   
   let expandedQuery = query.toLowerCase();
@@ -377,7 +384,9 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     let relevantResults = [];
     if (knowledgeResults.length > 0) {
       // Use intent classification to determine relevance threshold
-      const minSimilarity = intentClassification.confidence > 0.8 ? 0.25 : 0.3;
+      // Lower threshold for HR/policy questions
+      const isHRQuestion = /\b(leave|vacation|sick|annual|policy|employee|work|office)\b/i.test(userMessage);
+      const minSimilarity = isHRQuestion ? 0.2 : (intentClassification.confidence > 0.8 ? 0.25 : 0.3);
       
       relevantResults = knowledgeResults.filter(result => {
         return result.similarity > minSimilarity;
@@ -424,7 +433,11 @@ ${relevantResults.map(item => `- ${item.content}`).join('\n')}
 
 Customer question: "${userMessage}"
 
-Provide a clear, helpful answer based on the company information above. If the question uses different words but asks about the same topic (like "make love" vs "romance"), understand the intent and answer appropriately.`;
+Instructions:
+- If the question asks about "types of" something, summarize all the different types mentioned in the information
+- If the question uses different words but asks about the same topic, understand the intent and answer appropriately
+- Be comprehensive - if multiple related policies are mentioned, include them all
+- Provide a clear, helpful answer based on the company information above`;
 
     const result = await model.generateContent(context);
     const responseText = result.response.text();
