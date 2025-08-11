@@ -236,6 +236,20 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
+    // Handle service/product questions with company information
+    const serviceKeywords = ['services', 'products', 'what do you do', 'what do you offer', 'solutions', 'consulting'];
+    const isServiceQuestion = serviceKeywords.some(keyword => 
+      userMessage.toLowerCase().includes(keyword)
+    );
+
+    if (isServiceQuestion) {
+      return {
+        type: 'ai_response',
+        message: "We are Vanguard Business Consulting, specializing in ERP solutions and digital transformation. Our main services include:\n\n• **SAP S/4HANA** - Next-generation ERP for large enterprises\n• **SAP Business One** - ERP solution for SMBs\n• **Odoo ERP** - Open-source business management\n• **Cadena HRM** - Human resource management\n• **Implementation & Support** - End-to-end services\n• **Business Intelligence** - Analytics and reporting\n\nWould you like to know more about any specific service or connect with our sales team?",
+        sources: []
+      };
+    }
+
     // Check if it's a question
     const isQuestion = userMessage.includes('?') || 
                       userMessage.toLowerCase().startsWith('what') ||
@@ -265,23 +279,38 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       console.log(`📝 Top result preview: ${knowledgeResults[0].content.substring(0, 150)}...`);
     }
 
-    // If no knowledge found for question, suggest human handoff
-    if (knowledgeResults.length === 0) {
+    // Check if knowledge results are relevant (not just high similarity)
+    let relevantResults = [];
+    if (knowledgeResults.length > 0) {
+      // Filter out results that seem irrelevant to the question
+      const questionWords = userMessage.toLowerCase().split(' ');
+      relevantResults = knowledgeResults.filter(result => {
+        const content = result.content.toLowerCase();
+        // Check if the result content relates to the question context
+        const hasRelevantContext = questionWords.some(word => 
+          word.length > 3 && content.includes(word)
+        );
+        return hasRelevantContext && result.similarity > 0.5;
+      });
+    }
+
+    // If no relevant knowledge found for question, suggest human handoff
+    if (relevantResults.length === 0) {
       return {
         type: 'handoff_suggestion',
-        message: "I don't have specific information about that in my knowledge base. Would you like to connect with human support?",
+        message: "I don't have specific information about that in my knowledge base. Would you like to connect with human support for more detailed assistance?",
         reason: "No relevant knowledge found"
       };
     }
 
-    // Skip relevance check - if we found results with decent similarity, use them
-    console.log(`📋 Using knowledge base results for: "${userMessage}"`);
+    // Use relevant knowledge base results
+    console.log(`📋 Using ${relevantResults.length} relevant knowledge base results for: "${userMessage}"`);
 
-    // Generate response using ONLY knowledge base information
+    // Generate response using ONLY relevant knowledge base information
     const context = `You are a helpful assistant. Answer the customer's question using ONLY the information provided below. Do not add any information that is not explicitly stated in the knowledge base.
 
 Knowledge base information:
-${knowledgeResults.map(item => `- ${item.content}`).join('\n')}
+${relevantResults.map(item => `- ${item.content}`).join('\n')}
 
 Customer question: "${userMessage}"
 
@@ -293,7 +322,7 @@ Answer based strictly on the provided information.`;
     return {
       type: 'ai_response',
       message: responseText,
-      sources: knowledgeResults.map(item => ({
+      sources: relevantResults.map(item => ({
         content: item.content.substring(0, 100) + '...',
         similarity: item.similarity
       })),
@@ -304,8 +333,9 @@ Answer based strictly on the provided information.`;
   } catch (error) {
     console.error('AI generation error:', error);
     return {
-      type: 'error',
-      message: "I'm having trouble right now. Would you like to connect with human support?"
+      type: 'handoff_suggestion',
+      message: "I'm having trouble processing your request right now. Would you like to connect with human support?",
+      reason: "AI processing error"
     };
   }
 }
