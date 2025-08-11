@@ -213,7 +213,7 @@
 
             <div class="chat-messages" id="chat-messages"></div>
 
-            <div class="chat-input-container">
+            <div class="chat-input-container" id="chat-input-container">
               <input type="text" id="chat-input" placeholder="Type your message..." />
               <input type="file" id="file-input" style="display: none;" accept="image/*,.pdf,.doc,.docx,.txt">
               <div class="button-group">
@@ -467,6 +467,10 @@
           display: flex;
           flex-direction: column;
           gap: 8px;
+        }
+
+        .chat-input-container.hidden {
+          display: none !important;
         }
 
         .button-group {
@@ -1282,8 +1286,12 @@
 
     showCustomerInfoDialog() {
       const dialog = document.getElementById('customer-info-dialog');
+      const inputContainer = document.getElementById('chat-input-container');
       if (dialog) {
         dialog.style.display = 'block';
+        if (inputContainer) {
+          inputContainer.classList.add('hidden');
+        }
         console.log('Customer info dialog shown');
       } else {
         console.error('Customer info dialog not found');
@@ -1291,7 +1299,14 @@
     }
 
     hideCustomerInfoDialog() {
-      document.getElementById('customer-info-dialog').style.display = 'none';
+      const dialog = document.getElementById('customer-info-dialog');
+      const inputContainer = document.getElementById('chat-input-container');
+      if (dialog) {
+        dialog.style.display = 'none';
+      }
+      if (inputContainer) {
+        inputContainer.classList.remove('hidden');
+      }
       this.clearCustomerForm();
     }
 
