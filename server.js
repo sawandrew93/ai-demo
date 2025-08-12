@@ -48,41 +48,80 @@ const customerIdleTimeouts = new Map();
 const chatHistory = [];
 const agentReconnectTimeouts = new Map();
 
-// Agent users 
-const agentUsers = new Map([
-  ['agent1', {
-    id: 'agent1',
-    username: 'saw.andrew',
-    email: 'andrew.saw@vanguardmm.com',
-    name: 'Saw Andrew',
-    password: '$2b$10$example_hash_here',
-    role: 'agent',
-    isActive: true
-  }],
-  ['agent2', {
-    id: 'agent2',
-    username: 'blaze.hein',
-    email: 'blaze.hein@vanguardmm.com',
-    name: 'Blaze',
-    password: '$2b$10$example_hash_here2',
-    role: 'agent',
-    isActive: true
-  }]
-]);
+// Database-based user management
+class UserService {
+  static async getUserByUsername(username) {
+    try {
+      const { data, error } = await supabase
+        .from('agent_users')
+        .select('*')
+        .eq('username', username)
+        .eq('is_active', true)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      return null;
+    }
+  }
+  
+  static async createUser(userData) {
+    try {
+      const hashedPassword = await bcrypt.hash(userData.password, 12);
+      const { data, error } = await supabase
+        .from('agent_users')
+        .insert([{
+          username: userData.username,
+          email: userData.email,
+          name: userData.name,
+          password_hash: hashedPassword,
+          role: userData.role || 'agent'
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  }
+}
 
-async function initializeAgentUsers() {
-  const users = [
-    { id: 'agent1', username: 'saw.andrew', email: 'andrew.saw@vanguardmm.com', name: 'Saw Andrew', password: 'asd123!@#', role: 'agent' },
-    { id: 'agent2', username: 'blaze.hein', email: 'blaze.hein@vanguardmm.com', name: 'Blaze', password: 'asd123!@#', role: 'agent' }
-  ];
-
-  for (const user of users) {
-    const hashedPassword = await bcrypt.hash(user.password, 10);
-    agentUsers.set(user.id, {
-      ...user,
-      password: hashedPassword,
-      isActive: true
-    });
+async function initializeDefaultUsers() {
+  try {
+    // Check if admin user exists
+    const adminExists = await UserService.getUserByUsername('admin');
+    if (!adminExists) {
+      console.log('Creating default admin user...');
+      await UserService.createUser({
+        username: 'admin',
+        email: 'admin@vanguardmm.com',
+        name: 'System Admin',
+        password: process.env.ADMIN_PASSWORD || 'ChangeMe123!',
+        role: 'admin'
+      });
+      console.log('✅ Default admin user created');
+    }
+    
+    // Create sample agent users if they don't exist
+    const sampleUsers = [
+      { username: 'saw.andrew', email: 'andrew.saw@vanguardmm.com', name: 'Saw Andrew', password: process.env.AGENT_PASSWORD || 'Agent123!', role: 'agent' },
+      { username: 'blaze.hein', email: 'blaze.hein@vanguardmm.com', name: 'Blaze', password: process.env.AGENT_PASSWORD || 'Agent123!', role: 'agent' }
+    ];
+    
+    for (const user of sampleUsers) {
+      const exists = await UserService.getUserByUsername(user.username);
+      if (!exists) {
+        await UserService.createUser(user);
+        console.log(`✅ Created user: ${user.username}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error initializing users:', error);
   }
 }
 
@@ -918,7 +957,13 @@ function handleAgentJoin(ws, data) {
   let user;
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    user = agentUsers.get(decoded.agentId);
+    const { data: userData } = await supabase
+      .from('agent_users')
+      .select('*')
+      .eq('id', decoded.agentId)
+      .eq('is_active', true)
+      .single();
+    user = userData;
     if (!user || !user.isActive) {
       ws.send(JSON.stringify({ type: 'auth_error', message: 'Invalid user account' }));
       ws.close();
@@ -1508,34 +1553,27 @@ app.post('/api/agent/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
-    let foundUser = null;
-    for (const [id, user] of agentUsers) {
-      if (user.username === username && user.isActive) {
-        foundUser = { id, ...user };
-        break;
-      }
-    }
-
-    if (!foundUser) {
+    const user = await UserService.getUserByUsername(username);
+    if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const isValidPassword = await bcrypt.compare(password, foundUser.password);
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const token = jwt.sign(
       {
-        agentId: foundUser.id,
-        username: foundUser.username,
-        role: foundUser.role
+        agentId: user.id,
+        username: user.username,
+        role: user.role
       },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
 
-    const { password: _, ...userWithoutPassword } = foundUser;
+    const { password_hash, ...userWithoutPassword } = user;
 
     res.json({
       success: true,
@@ -1549,17 +1587,28 @@ app.post('/api/agent/login', async (req, res) => {
   }
 });
 
-app.get('/api/agent/validate', verifyToken, (req, res) => {
-  const user = agentUsers.get(req.user.agentId);
-  if (!user || !user.isActive) {
-    return res.status(401).json({ error: 'Invalid user account' });
-  }
+app.get('/api/agent/validate', verifyToken, async (req, res) => {
+  try {
+    const { data: user, error } = await supabase
+      .from('agent_users')
+      .select('*')
+      .eq('id', req.user.agentId)
+      .eq('is_active', true)
+      .single();
+    
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid user account' });
+    }
 
-  const { password: _, ...userWithoutPassword } = user;
-  res.json({
-    success: true,
-    user: { id: user.id, ...userWithoutPassword }
-  });
+    const { password_hash, ...userWithoutPassword } = user;
+    res.json({
+      success: true,
+      user: userWithoutPassword
+    });
+  } catch (error) {
+    console.error('Token validation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 function verifyToken(req, res, next) {
@@ -2156,17 +2205,18 @@ app.delete('/api/delete-attachments', verifyToken, async (req, res) => {
 
 // Initialize and start server
 async function startServer() {
-  await initializeAgentUsers();
+  await initializeDefaultUsers();
   
   // Feedback table should already exist from setup-complete-database.sql
   console.log('✅ Using existing feedback table from database setup');
 
   server.listen(process.env.PORT || 3000, () => {
     console.log(`Server running on port ${process.env.PORT || 3000}`);
-    console.log('Available agent accounts:');
-    for (const [id, user] of agentUsers) {
-      console.log(`- ${user.name} (${user.username}) - Role: ${user.role}`);
-    }
+    console.log('✅ Database-based user authentication initialized');
+    console.log('Default credentials:');
+    console.log('- Username: admin, Password: ChangeMe123! (change via ADMIN_PASSWORD env var)');
+    console.log('- Username: saw.andrew, Password: Agent123! (change via AGENT_PASSWORD env var)');
+    console.log('- Username: blaze.hein, Password: Agent123! (change via AGENT_PASSWORD env var)');
   });
 }
 
