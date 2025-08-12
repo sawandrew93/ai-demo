@@ -38,9 +38,6 @@ echo "⏰ Setting up auto-renewal..."
 sudo systemctl enable certbot.timer
 sudo systemctl start certbot.timer
 
-# Test renewal
-echo "🧪 Testing certificate renewal..."
-sudo certbot renew --dry-run
-
+# notify 
 echo "✅ SSL setup complete!"
 echo "🌐 Your site should now be available at https://$DOMAIN"
