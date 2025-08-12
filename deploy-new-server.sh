@@ -5,7 +5,13 @@
 
 set -e
 
-DOMAIN=${1:-"yourdomain.com"}
+if [ -z "$1" ]; then
+    echo "❌ Error: Domain parameter is required"
+    echo "Usage: ./deploy-new-server.sh yourdomain.com"
+    exit 1
+fi
+
+DOMAIN=$1
 APP_DIR="/home/ubuntu/ai-demo"
 
 echo "🚀 Starting deployment for domain: $DOMAIN"
@@ -35,11 +41,11 @@ sudo apt install -y certbot python3-certbot-nginx
 echo "📥 Cloning repository..."
 if [ -d "$APP_DIR" ]; then
     cd $APP_DIR
-    git pull origin rollback-test
+    git pull origin feature-update
 else
     git clone https://github.com/sawandrew93/ai-demo.git $APP_DIR
     cd $APP_DIR
-    git checkout rollback-test
+    git checkout feature-update
 fi
 
 # Install dependencies

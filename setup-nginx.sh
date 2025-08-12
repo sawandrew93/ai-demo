@@ -5,7 +5,13 @@
 
 set -e
 
-DOMAIN=${1:-"yourdomain.com"}
+if [ -z "$1" ]; then
+    echo "❌ Error: Domain parameter is required"
+    echo "Usage: sudo ./setup-nginx.sh yourdomain.com"
+    exit 1
+fi
+
+DOMAIN=$1
 
 echo "🌐 Setting up Nginx for domain: $DOMAIN"
 
