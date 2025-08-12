@@ -15,8 +15,8 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Trust proxy for proper IP detection behind reverse proxy
-app.set('trust proxy', true);
+// Trust proxy for proper IP detection behind reverse proxy (only first hop)
+app.set('trust proxy', 1);
 
 // Security Middleware
 app.use(cors());
@@ -39,7 +39,11 @@ const apiLimiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   message: { error: 'Too many requests, please try again later' },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  validate: {
+    trustProxy: false, // Disable validation for production
+    xForwardedForHeader: false
+  }
 });
 app.use('/api/', apiLimiter);
 
@@ -49,7 +53,11 @@ const authLimiter = rateLimit({
   max: 5, // limit each IP to 5 login attempts per windowMs
   message: { error: 'Too many login attempts, please try again later' },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  validate: {
+    trustProxy: false, // Disable validation for production
+    xForwardedForHeader: false
+  }
 });
 
 // Input validation helper
