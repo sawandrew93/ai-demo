@@ -20,8 +20,8 @@ app.use(express.static('public'));
 
 // Initialize Gemini AI with latest models
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" }); // Gemini 2.5 Flash Lite
-const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-001" }); // Gemini Embeddings 001
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" }); 
 
 // Import knowledge base services
 const EmbeddingService = require('./knowledge-base/embeddings');
@@ -472,10 +472,34 @@ Instructions:
 - If the question asks about "types of" something, summarize all the different types mentioned in the information
 - If the question uses different words but asks about the same topic, understand the intent and answer appropriately
 - Be comprehensive - if multiple related policies are mentioned, include them all
-- Provide a clear, helpful answer based on the company information above`;
+- Provide a clear, helpful answer based on the company information above
+- Do NOT say "I don't have information" or "not available" - just answer based on what's provided`;
 
     const result = await model.generateContent(context);
     const responseText = result.response.text();
+
+    // Check if AI response indicates no information available
+    const noInfoIndicators = [
+      'i don\'t have', 'no information', 'not contain', 'does not contain',
+      'i am sorry', 'i\'m sorry', 'no details', 'not available',
+      'cannot find', 'no specific information'
+    ];
+    
+    const hasNoInfoResponse = noInfoIndicators.some(indicator => 
+      responseText.toLowerCase().includes(indicator)
+    );
+    
+    if (hasNoInfoResponse) {
+      // AI couldn't answer with available knowledge, suggest handoff
+      return {
+        type: 'handoff_suggestion',
+        message: "I don't have specific information about that in my knowledge base. Would you like me to connect you with one of our support representatives who can provide more detailed assistance?",
+        reason: "AI generated no-information response",
+        intent: intentClassification.intent,
+        category: intentClassification.category,
+        confidence: intentClassification.confidence
+      };
+    }
 
     // Calculate enhanced confidence score
     const avgSimilarity = relevantResults.reduce((sum, r) => sum + r.similarity, 0) / relevantResults.length;
