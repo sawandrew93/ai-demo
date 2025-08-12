@@ -16,7 +16,7 @@ DOMAIN=$1
 echo "🌐 Setting up Nginx for domain: $DOMAIN"
 
 # Create Nginx configuration
-cat > /tmp/nginx-site.conf << EOF
+sudo tee /tmp/nginx-site.conf > /dev/null << EOF
 # WebSocket upgrade mapping (must be at http level)
 map \$http_upgrade \$connection_upgrade {
     default upgrade;
@@ -34,21 +34,21 @@ server {
 server {
     listen 443 ssl http2;
     server_name $DOMAIN;
-    
+
     # SSL configuration (Certbot will modify these paths)
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-    
+
     # SSL security settings
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers off;
-    
+
     # Main application with WebSocket support
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
-        
+
         # WebSocket headers
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection \$connection_upgrade;
@@ -58,12 +58,12 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header X-Forwarded-Host \$server_name;
         proxy_set_header X-Forwarded-Port \$server_port;
-        
+
         # WebSocket timeouts
         proxy_read_timeout 86400s;
         proxy_send_timeout 86400s;
         proxy_connect_timeout 60s;
-        
+
         # Disable buffering for WebSocket
         proxy_buffering off;
         proxy_cache_bypass \$http_upgrade;
