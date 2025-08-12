@@ -2217,12 +2217,7 @@ async function startServer() {
   console.log('✅ Using existing feedback table from database setup');
 
   server.listen(process.env.PORT || 3000, () => {
-    console.log(`Server running on port ${process.env.PORT || 3000}`);
-    console.log('✅ Database-based user authentication initialized');
-    console.log('Default credentials:');
-    console.log('- Username: admin, Password: ChangeMe123! (change via ADMIN_PASSWORD env var)');
-    console.log('- Username: saw.andrew, Password: Agent123! (change via AGENT_PASSWORD env var)');
-    console.log('- Username: blaze.hein, Password: Agent123! (change via AGENT_PASSWORD env var)');
+    console.log(`Server running on port ${process.env.PORT || 3000}`);  
   });
 }
 
