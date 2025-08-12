@@ -73,11 +73,11 @@ fi
 
 # Setup Nginx
 echo "🌐 Configuring Nginx..."
-sudo ./setup-nginx.sh $DOMAIN
+./setup-nginx.sh $DOMAIN
 
 # Setup SSL
 echo "🔒 Setting up SSL certificate..."
-sudo ./setup-ssl.sh $DOMAIN
+./setup-ssl.sh $DOMAIN
 
 # Start application with PM2
 echo "🚀 Starting application..."
