@@ -77,6 +77,6 @@ else
 fi
 
 # Clean up
-rm -f /tmp/nginx-site.conf
+sudo rm -f /tmp/nginx-site.conf
 
 echo "✅ Nginx setup complete for $DOMAIN"
