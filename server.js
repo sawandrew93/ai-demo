@@ -566,7 +566,7 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       }
       return {
         type: 'handoff_suggestion',
-        message: "I don't have specific information about that in my knowledge base. Would you like me to connect you with one of our support representatives who can provide more detailed assistance?",
+        message: "I don't have specific information about that. Would you like me to connect you with one of our support representatives who can provide more detailed assistance?",
         reason: "No relevant knowledge found for this specific question",
         intent: intentClassification.intent,
         category: intentClassification.category,
