@@ -951,7 +951,7 @@ async function handleCustomerMessage(ws, sessionId, message) {
 }
 
 // Keep all existing handler functions (handleAgentJoin, handleAcceptRequest, etc.)
-function handleAgentJoin(ws, data) {
+async function handleAgentJoin(ws, data) {
   const { agentId, token } = data;
 
   let user;
@@ -964,7 +964,7 @@ function handleAgentJoin(ws, data) {
       .eq('is_active', true)
       .single();
     user = userData;
-    if (!user || !user.isActive) {
+    if (!user || !user.is_active) {
       ws.send(JSON.stringify({ type: 'auth_error', message: 'Invalid user account' }));
       ws.close();
       return;
