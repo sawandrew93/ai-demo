@@ -107,7 +107,7 @@ async function initializeDefaultUsers() {
         username: 'admin',
         email: 'admin@vanguardmm.com',
         name: 'System Admin',
-        password: process.env.ADMIN_PASSWORD || 'ChangeMe123!',
+        password: process.env.ADMIN_PASSWORD,
         role: 'admin'
       });
       console.log('✅ Default admin user created');
@@ -115,8 +115,8 @@ async function initializeDefaultUsers() {
     
     // Create sample agent users if they don't exist
     const sampleUsers = [
-      { username: 'saw.andrew', email: 'andrew.saw@vanguardmm.com', name: 'Saw Andrew', password: process.env.AGENT_PASSWORD || 'Agent123!', role: 'agent' },
-      { username: 'blaze.hein', email: 'blaze.hein@vanguardmm.com', name: 'Blaze', password: process.env.AGENT_PASSWORD || 'Agent123!', role: 'agent' }
+      { username: 'saw.andrew', email: 'andrew.saw@vanguardmm.com', name: 'Saw Andrew', password: process.env.AGENT1_PASSWORD, role: 'agent' },
+      { username: 'blaze.hein', email: 'blaze.hein@vanguardmm.com', name: 'Blaze', password: process.env.AGENT2_PASSWORD, role: 'agent' }
     ];
     
     for (const user of sampleUsers) {
