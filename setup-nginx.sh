@@ -20,14 +20,14 @@ map \$http_upgrade \$connection_upgrade {
 # HTTP to HTTPS redirect
 server {
     listen 80;
-    server_name $DOMAIN www.$DOMAIN;
+    server_name $DOMAIN;
     return 301 https://\$server_name\$request_uri;
 }
 
 # HTTPS server
 server {
     listen 443 ssl http2;
-    server_name $DOMAIN www.$DOMAIN;
+    server_name $DOMAIN;
     
     # SSL configuration (Certbot will modify these paths)
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
