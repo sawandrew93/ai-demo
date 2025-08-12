@@ -102,12 +102,13 @@ async function initializeDefaultUsers() {
     // Check if admin user exists
     const adminExists = await UserService.getUserByUsername('admin');
     if (!adminExists) {
+      const adminPassword = process.env.ADMIN_PASSWORD || 'ChangeMe123!';
       console.log('Creating default admin user...');
       await UserService.createUser({
         username: 'admin',
         email: 'admin@vanguardmm.com',
         name: 'System Admin',
-        password: process.env.ADMIN_PASSWORD,
+        password: adminPassword,
         role: 'admin'
       });
       console.log('✅ Default admin user created');
@@ -115,8 +116,20 @@ async function initializeDefaultUsers() {
     
     // Create sample agent users if they don't exist
     const sampleUsers = [
-      { username: 'saw.andrew', email: 'andrew.saw@vanguardmm.com', name: 'Saw Andrew', password: process.env.AGENT1_PASSWORD, role: 'agent' },
-      { username: 'blaze.hein', email: 'blaze.hein@vanguardmm.com', name: 'Blaze', password: process.env.AGENT2_PASSWORD, role: 'agent' }
+      { 
+        username: 'saw.andrew', 
+        email: 'andrew.saw@vanguardmm.com', 
+        name: 'Saw Andrew', 
+        password: process.env.AGENT1_PASSWORD || process.env.AGENT_PASSWORD || 'Agent123!', 
+        role: 'agent' 
+      },
+      { 
+        username: 'blaze.hein', 
+        email: 'blaze.hein@vanguardmm.com', 
+        name: 'Blaze', 
+        password: process.env.AGENT2_PASSWORD || process.env.AGENT_PASSWORD || 'Agent123!', 
+        role: 'agent' 
+      }
     ];
     
     for (const user of sampleUsers) {
