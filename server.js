@@ -120,14 +120,14 @@ async function initializeDefaultUsers() {
         username: 'saw.andrew', 
         email: 'andrew.saw@vanguardmm.com', 
         name: 'Saw Andrew', 
-        password: process.env.AGENT1_PASSWORD || process.env.AGENT_PASSWORD || 'Agent123!', 
+        password: process.env.AGENT1_PASSWORD || process.env.AGENT1_PASSWORD || 'Agent123!', 
         role: 'agent' 
       },
       { 
         username: 'blaze.hein', 
         email: 'blaze.hein@vanguardmm.com', 
         name: 'Blaze', 
-        password: process.env.AGENT2_PASSWORD || process.env.AGENT_PASSWORD || 'Agent123!', 
+        password: process.env.AGENT2_PASSWORD || process.env.AGENT2_PASSWORD || 'Agent123!', 
         role: 'agent' 
       }
     ];
