@@ -26,7 +26,7 @@ else
         --non-interactive \
         --agree-tos \
         --email admin@$DOMAIN \
-        -d $DOMAIN \
+        -d $DOMAIN
 fi
 
 # Start nginx
