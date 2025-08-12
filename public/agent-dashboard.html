@@ -257,7 +257,11 @@
 
                 this.updateConnectionStatus('connecting', 'Connecting to server...');
 
-                const wsUrl = `ws://${window.location.host}`;
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const hostname = window.location.hostname;
+                const wsUrl = window.location.protocol === 'https:' 
+                    ? `${protocol}//${hostname}` 
+                    : `${protocol}//${hostname}:3000`;
                 this.ws = new WebSocket(wsUrl);
 
                 this.ws.onopen = () => {

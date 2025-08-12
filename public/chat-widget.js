@@ -1536,10 +1536,16 @@
     new ChatWidget(window.chatWidgetConfig);
   } else {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
+    const hostname = window.location.hostname;
+    
+    // For HTTPS production, use same domain (Nginx proxy)
+    // For local development, use port 3000
+    const serverUrl = window.location.protocol === 'https:' 
+      ? `${protocol}//${hostname}` 
+      : `${protocol}//${hostname}:3000`;
 
     const defaultConfig = {
-      serverUrl: `${protocol}//${host}`,
+      serverUrl: serverUrl,
       position: 'bottom-right',
       primaryColor: '#007bff',
       title: 'Support Chat'
