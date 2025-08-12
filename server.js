@@ -105,43 +105,88 @@ async function generateEmbedding(text) {
   }
 }
 
-// Query expansion for better semantic matching
-function expandQuery(query) {
-  const expansions = {
-    'make love': ['romance', 'dating', 'relationship', 'intimate'],
-    'office romance': ['workplace dating', 'employee relationship', 'office dating'],
-    'dating': ['romance', 'relationship', 'romantic'],
-    'love': ['romance', 'dating', 'relationship'],
-    'relationship': ['dating', 'romance', 'romantic'],
-    'price': ['cost', 'pricing', 'expensive', 'budget'],
-    'help': ['support', 'assistance', 'problem'],
-    'setup': ['installation', 'configuration', 'implementation'],
-    'leaves': ['leave', 'vacation', 'annual leave', 'sick leave', 'medical leave', 'time off', 'holiday'],
-    'leave': ['leaves', 'vacation', 'annual', 'sick', 'medical', 'time off', 'holiday', 'absence'],
-    'vacation': ['leave', 'annual leave', 'time off', 'holiday'],
-    'sick': ['medical', 'illness', 'sick leave', 'medical leave'],
-    'annual': ['yearly', 'vacation', 'annual leave'],
-    'time off': ['leave', 'vacation', 'absence', 'holiday'],
-    'types of': ['what', 'available', 'allowed', 'different', 'kinds of']
+// AI-driven query expansion based on intent classification
+function expandQuery(query, intentClassification) {
+  const intentExpansions = {
+    'pricing_inquiry': ['cost', 'price', 'pricing', 'budget', 'expensive', 'cheap', 'quote', 'estimate', 'fee'],
+    'product_inquiry': ['services', 'products', 'solutions', 'features', 'capabilities', 'offerings', 'what we do'],
+    'demo_request': ['demo', 'trial', 'test', 'preview', 'show', 'demonstration', 'try'],
+    'technical_support': ['help', 'support', 'problem', 'issue', 'error', 'bug', 'troubleshoot', 'fix'],
+    'implementation_help': ['setup', 'install', 'configure', 'deploy', 'implementation', 'integration'],
+    'account_management': ['account', 'billing', 'payment', 'subscription', 'invoice', 'cancel'],
+    'hr_policy': ['leave', 'vacation', 'sick', 'annual', 'policy', 'employee', 'work', 'office', 'time off', 'holiday'],
+    'complaint': ['complain', 'frustrated', 'angry', 'disappointed', 'terrible', 'awful', 'bad', 'dissatisfied']
   };
   
-  let expandedQuery = query.toLowerCase();
+  let expandedQuery = query;
   
-  for (const [key, synonyms] of Object.entries(expansions)) {
-    if (expandedQuery.includes(key)) {
-      expandedQuery += ' ' + synonyms.join(' ');
+  // Add intent-specific expansions
+  if (intentClassification && intentExpansions[intentClassification.intent]) {
+    const synonyms = intentExpansions[intentClassification.intent];
+    expandedQuery += ' ' + synonyms.join(' ');
+  }
+  
+  // Add some common semantic expansions
+  const commonExpansions = {
+    'make love': 'romance dating relationship intimate',
+    'types of': 'what available allowed different kinds'
+  };
+  
+  for (const [key, expansion] of Object.entries(commonExpansions)) {
+    if (query.toLowerCase().includes(key)) {
+      expandedQuery += ' ' + expansion;
     }
   }
   
   return expandedQuery;
 }
 
+// Intent-aware knowledge base search
+async function searchKnowledgeBaseWithIntent(query, intentClassification, limit = 5) {
+  try {
+    console.log('🔍 Searching knowledge base for:', query);
+    console.log('🤖 AI Intent:', intentClassification.intent, 'Confidence:', intentClassification.confidence);
+    
+    // Expand query based on AI intent classification
+    const expandedQuery = expandQuery(query, intentClassification);
+    console.log('🔍 Intent-expanded query:', expandedQuery);
+    
+    // Generate embedding for the expanded query
+    const queryEmbedding = await generateEmbedding(expandedQuery);
+    console.log('✅ Generated embedding, length:', queryEmbedding.length);
+
+    // Adjust threshold based on AI confidence
+    const baseThreshold = intentClassification.confidence > 0.8 ? SIMILARITY_THRESHOLD - 0.1 : SIMILARITY_THRESHOLD;
+    
+    // Search using the knowledge base service
+    let results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, baseThreshold, limit);
+
+    // If no results, try with lower threshold
+    if (!results || results.length === 0) {
+      console.log('🔍 No results with AI-adjusted threshold, trying lower threshold...');
+      results = await knowledgeDB.searchSimilarDocuments(queryEmbedding, 0.25, limit);
+    }
+
+    console.log(`📊 Found ${results?.length || 0} results`);
+    if (results && results.length > 0) {
+      console.log('📝 Top result similarity:', results[0].similarity);
+      console.log('📝 Top result:', results[0].content?.substring(0, 100) + '...');
+    }
+
+    return results || [];
+  } catch (error) {
+    console.error('❌ Knowledge base search error:', error);
+    return [];
+  }
+}
+
+// Keep original function for backward compatibility
 async function searchKnowledgeBase(query, limit = 5) {
   try {
     console.log('🔍 Searching knowledge base for:', query);
     
-    // Expand query for better semantic matching
-    const expandedQuery = expandQuery(query);
+    // Expand query based on AI intent classification
+    const expandedQuery = expandQuery(query, null); // Will be enhanced when called from generateAIResponse
     console.log('🔍 Expanded query:', expandedQuery);
     
     // Generate embedding for the expanded query
@@ -225,58 +270,65 @@ async function analyzeHandoffIntent(message, conversationHistory = []) {
   }
 }
 
-// ========== ENHANCED INTENT CLASSIFICATION ========== //
-function classifyIntent(message) {
-  const msg = message.toLowerCase();
-  
-  // Pricing & Cost inquiries
-  if (/\b(price|pricing|cost|expensive|cheap|budget|quote|estimate)\b/.test(msg)) {
-    return { intent: 'pricing_inquiry', category: 'pricing', confidence: 0.9 };
+// ========== AI-POWERED INTENT CLASSIFICATION ========== //
+async function classifyIntent(message, conversationHistory = []) {
+  try {
+    const context = `Analyze this customer message and classify the intent. Consider the conversation context if provided.
+
+Available intent categories:
+- pricing_inquiry: Questions about cost, pricing, budget, quotes
+- product_inquiry: Questions about services, features, capabilities, what you offer
+- demo_request: Requests for demos, trials, testing, previews
+- technical_support: Help with problems, issues, errors, bugs, troubleshooting
+- implementation_help: Setup, installation, configuration, deployment, integration
+- account_management: Billing, payments, subscriptions, account issues
+- complaint: Expressions of frustration, disappointment, anger, dissatisfaction
+- human_request: Explicit requests to talk to humans, agents, representatives
+- hr_policy: Questions about company policies, leaves, work rules, employee guidelines
+- greeting: Simple greetings and pleasantries
+- general_inquiry: General questions that don't fit other categories
+
+Conversation context:
+${conversationHistory.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}
+
+Customer message: "${message}"
+
+Respond with only a JSON object:
+{
+  "intent": "category_name",
+  "category": "main_category", 
+  "confidence": 0.0-1.0,
+  "reasoning": "brief explanation"
+}`;
+
+    const result = await model.generateContent(context);
+    const responseText = result.response.text().trim();
+    
+    // Extract JSON from response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const classification = JSON.parse(jsonMatch[0]);
+      return {
+        intent: classification.intent || 'general_inquiry',
+        category: classification.category || 'general',
+        confidence: Math.min(Math.max(classification.confidence || 0.5, 0), 1),
+        reasoning: classification.reasoning || ''
+      };
+    }
+    
+    // Fallback if JSON parsing fails
+    return { intent: 'general_inquiry', category: 'general', confidence: 0.5, reasoning: 'AI classification failed' };
+  } catch (error) {
+    console.error('AI intent classification error:', error);
+    return { intent: 'general_inquiry', category: 'general', confidence: 0.5, reasoning: 'Classification error' };
   }
-  
-  // Product & Service inquiries
-  if (/\b(what do you|services|products|solutions|features|capabilities)\b/.test(msg)) {
-    return { intent: 'product_inquiry', category: 'product', confidence: 0.8 };
-  }
-  
-  // Demo & Trial requests
-  if (/\b(demo|trial|test|try|show me|preview)\b/.test(msg)) {
-    return { intent: 'demo_request', category: 'sales', confidence: 0.9 };
-  }
-  
-  // Technical Support
-  if (/\b(help|support|problem|issue|error|bug|not working|broken)\b/.test(msg)) {
-    return { intent: 'technical_support', category: 'support', confidence: 0.8 };
-  }
-  
-  // Implementation & Integration
-  if (/\b(implement|integration|setup|install|configure|deploy)\b/.test(msg)) {
-    return { intent: 'implementation_help', category: 'technical', confidence: 0.8 };
-  }
-  
-  // Account & Billing
-  if (/\b(account|billing|payment|subscription|invoice|cancel)\b/.test(msg)) {
-    return { intent: 'account_management', category: 'billing', confidence: 0.8 };
-  }
-  
-  // Complaints
-  if (/\b(complain|disappointed|frustrated|angry|terrible|awful|bad)\b/.test(msg)) {
-    return { intent: 'complaint', category: 'support', confidence: 0.7 };
-  }
-  
-  // Human agent requests
-  if (/\b(human|agent|person|representative|talk to|speak with)\b/.test(msg)) {
-    return { intent: 'human_request', category: 'escalation', confidence: 0.9 };
-  }
-  
-  return { intent: 'general_inquiry', category: 'general', confidence: 0.5 };
 }
 
 // ========== ENHANCED AI RESPONSE GENERATION ========== //
 async function generateAIResponse(userMessage, conversationHistory = []) {
   try {
-    // Classify intent first
-    const intentClassification = classifyIntent(userMessage);
+    // Classify intent using AI
+    const intentClassification = await classifyIntent(userMessage, conversationHistory);
     
     // Handle greeting messages
     const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
@@ -308,32 +360,15 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
-    // Handle explicit human support requests
-    const humanRequestKeywords = [      
-      'talk with support', 'talk with human', 'speak with agent', 'connect with human',
-      'human support', 'live agent', 'real person', 'support assistant', 'customer support',
-      'can i talk with', 'speak to someone', 'talk to someone', 'human agent', 'representative',
-      'talk to a person', 'talk with a person', 'speak to a human', 'speak with a human',
-      'get me a human', 'i want a human', 'i need a human', 'human please', 'live person',
-      'connect me to a human', 'can i speak to a human', 'can i talk to an agent',
-      'talk to customer service', 'speak to customer service', 'get customer service',
-      'human operator', 'talk to operator', 'operator please', 'get me support',
-      'i want to talk to a person', 'i want to talk to an agent', 'contact human',
-      'contact agent', 'contact support', 'customer care', 'real agent', 'talk to rep',
-      'speak to rep', 'live rep', 'connect to live agent', 'transfer to agent',
-      'talk to live support', 'can i speak to someone', 'can i talk to someone',
-      'can i talk to support', 'talk to support', 'speak to support', 'connect to support'
-    ];
-
-    const isHumanRequest = humanRequestKeywords.some(keyword => 
-      userMessage.toLowerCase().includes(keyword)
-    );
-
-    if (isHumanRequest) {
+    // Check if AI classified this as a human request
+    if (intentClassification.intent === 'human_request' && intentClassification.confidence > 0.7) {
       return {
         type: 'handoff_suggestion',
         message: "Sure! I'll connect you with one of our support representatives right away. They'll be able to provide personalized assistance.",
-        reason: "Customer explicitly requested human support"
+        reason: `AI detected human request (confidence: ${intentClassification.confidence})`,
+        intent: intentClassification.intent,
+        category: intentClassification.category,
+        confidence: intentClassification.confidence
       };
     }
 
@@ -373,8 +408,8 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
-    // For questions, search knowledge base
-    const knowledgeResults = await searchKnowledgeBase(userMessage);
+    // For questions, search knowledge base with intent-aware expansion
+    const knowledgeResults = await searchKnowledgeBaseWithIntent(userMessage, intentClassification);
     console.log(`📊 Knowledge search results: ${knowledgeResults.length} found`);
     if (knowledgeResults.length > 0) {
       console.log(`📝 Top result preview: ${knowledgeResults[0].content.substring(0, 150)}...`);
@@ -383,10 +418,10 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     // Improved relevance checking with lower thresholds
     let relevantResults = [];
     if (knowledgeResults.length > 0) {
-      // Use intent classification to determine relevance threshold
-      // Lower threshold for HR/policy questions
-      const isHRQuestion = /\b(leave|vacation|sick|annual|policy|employee|work|office)\b/i.test(userMessage);
-      const minSimilarity = isHRQuestion ? 0.2 : (intentClassification.confidence > 0.8 ? 0.25 : 0.3);
+      // Use AI intent classification to determine relevance threshold
+      const isHRQuestion = intentClassification.category === 'hr_policy' || intentClassification.intent === 'hr_policy';
+      const isHighConfidence = intentClassification.confidence > 0.8;
+      const minSimilarity = isHRQuestion ? 0.2 : (isHighConfidence ? 0.25 : 0.3);
       
       relevantResults = knowledgeResults.filter(result => {
         return result.similarity > minSimilarity;
@@ -397,7 +432,7 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
 
     // If no relevant knowledge found, try one more search with original query
     if (relevantResults.length === 0 && knowledgeResults.length === 0) {
-      console.log(`🔄 No results found, trying original query: "${userMessage}"`);
+      console.log(`🔄 No results found, trying fallback search: "${userMessage}"`);
       const originalResults = await searchKnowledgeBase(userMessage, 3);
       if (originalResults.length > 0) {
         relevantResults = originalResults.filter(r => r.similarity > 0.2);
