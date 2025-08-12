@@ -21,6 +21,10 @@ CREATE INDEX IF NOT EXISTS idx_agent_users_email ON agent_users(email);
 -- Enable Row Level Security
 ALTER TABLE agent_users ENABLE ROW LEVEL SECURITY;
 
--- Create policy for authenticated access
-CREATE POLICY "Users can read own data" ON agent_users
-    FOR SELECT USING (auth.uid()::text = id::text OR role = 'admin');
+-- Allow service role to manage users (for application)
+CREATE POLICY "Service role full access" ON agent_users
+    FOR ALL USING (current_setting('role') = 'service_role');
+
+-- Allow authenticated users to read user data
+CREATE POLICY "Users can read user data" ON agent_users
+    FOR SELECT USING (true);

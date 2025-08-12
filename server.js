@@ -37,6 +37,12 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
+// Service client for admin operations (bypasses RLS)
+const supabaseService = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
+);
+
 // Storage
 const conversations = new Map();
 const humanAgents = new Map();
@@ -52,14 +58,14 @@ const agentReconnectTimeouts = new Map();
 class UserService {
   static async getUserByUsername(username) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseService
         .from('agent_users')
         .select('*')
         .eq('username', username)
         .eq('is_active', true)
         .single();
       
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') throw error;
       return data;
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -70,7 +76,7 @@ class UserService {
   static async createUser(userData) {
     try {
       const hashedPassword = await bcrypt.hash(userData.password, 12);
-      const { data, error } = await supabase
+      const { data, error } = await supabaseService
         .from('agent_users')
         .insert([{
           username: userData.username,
@@ -957,7 +963,7 @@ async function handleAgentJoin(ws, data) {
   let user;
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const { data: userData } = await supabase
+    const { data: userData } = await supabaseService
       .from('agent_users')
       .select('*')
       .eq('id', decoded.agentId)
@@ -1589,7 +1595,7 @@ app.post('/api/agent/login', async (req, res) => {
 
 app.get('/api/agent/validate', verifyToken, async (req, res) => {
   try {
-    const { data: user, error } = await supabase
+    const { data: user, error } = await supabaseService
       .from('agent_users')
       .select('*')
       .eq('id', req.user.agentId)
