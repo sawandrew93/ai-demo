@@ -73,10 +73,12 @@ fi
 
 # Setup Nginx
 echo "🌐 Configuring Nginx..."
+chmod +x setup-nginx.sh
 ./setup-nginx.sh $DOMAIN
 
 # Setup SSL
 echo "🔒 Setting up SSL certificate..."
+chmod +x setup-ssl.sh
 ./setup-ssl.sh $DOMAIN
 
 # Start application with PM2
