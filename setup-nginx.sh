@@ -15,7 +15,7 @@ DOMAIN=$1
 
 echo "🌐 Setting up Nginx for domain: $DOMAIN"
 
-# Create Nginx configuration
+# Create Nginx configuration (HTTP only - Certbot will add HTTPS)
 sudo tee /tmp/nginx-site.conf > /dev/null << EOF
 # WebSocket upgrade mapping (must be at http level)
 map \$http_upgrade \$connection_upgrade {
@@ -23,26 +23,9 @@ map \$http_upgrade \$connection_upgrade {
     '' close;
 }
 
-# HTTP to HTTPS redirect
 server {
     listen 80;
     server_name $DOMAIN;
-    return 301 https://\$server_name\$request_uri;
-}
-
-# HTTPS server
-server {
-    listen 443 ssl http2;
-    server_name $DOMAIN;
-
-    # SSL configuration (Certbot will modify these paths)
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-
-    # SSL security settings
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
 
     # Main application with WebSocket support
     location / {
