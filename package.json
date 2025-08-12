@@ -39,7 +39,9 @@
     "node-fetch": "^2.7.0",
     "pdf-parse": "^1.1.1",
     "ws": "^8.13.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

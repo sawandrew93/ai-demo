@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const { body, validationResult } = require('express-validator');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { createClient } = require('@supabase/supabase-js');
 const WebSocket = require('ws');
@@ -13,10 +15,41 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Middleware
+// Security Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Limit JSON payload size
 app.use(express.static('public'));
+
+// Rate limiting for API routes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/', apiLimiter);
+
+// Stricter rate limiting for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 login attempts per windowMs
+  message: { error: 'Too many login attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Input validation helper
+function handleValidationErrors(req, res, next) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ 
+      error: 'Invalid input', 
+      details: errors.array() 
+    });
+  }
+  next();
+}
 
 // Initialize Gemini AI with latest models
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -149,7 +182,12 @@ const CUSTOMER_TIMEOUT = 10 * 60 * 1000;
 const CUSTOMER_IDLE_WARNING = 10 * 60 * 1000; // 10 minutes for idle warning
 const CUSTOMER_IDLE_TIMEOUT = (10 * 60 * 1000) + (30 * 1000); // 10 minutes + 30 seconds total
 const AGENT_RECONNECT_WINDOW = 5 * 60 * 1000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+// Secure JWT secret - no fallback allowed
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('❌ JWT_SECRET environment variable is required for security');
+  process.exit(1);
+}
 const SIMILARITY_THRESHOLD = 0.4; // Minimum similarity for knowledge base answers
 const HANDOFF_THRESHOLD = 0.8; // Threshold for intelligent handoff detection
 
@@ -1564,13 +1602,23 @@ wss.on('connection', (ws) => {
 });
 
 // ========== AUTHENTICATION ROUTES ========== //
-app.post('/api/agent/login', async (req, res) => {
+app.post('/api/agent/login', 
+  authLimiter,
+  [
+    body('username')
+      .isLength({ min: 3, max: 50 })
+      .matches(/^[a-zA-Z0-9._-]+$/)
+      .withMessage('Username must be 3-50 characters, alphanumeric with . _ - only'),
+    body('password')
+      .isLength({ min: 6, max: 100 })
+      .withMessage('Password must be 6-100 characters')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
-    }
+    // Input validation already handled by middleware
 
     const user = await UserService.getUserByUsername(username);
     if (!user) {
