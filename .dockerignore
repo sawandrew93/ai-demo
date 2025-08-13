@@ -1,0 +1,12 @@
+node_modules
+.git
+.gitignore
+README.md
+.env
+.env.local
+.env.example
+uploads/*
+temp/*
+*.log
+.DS_Store
+Thumbs.db
