@@ -485,5 +485,24 @@
         });
     </script>
     <script src="agent-notifications.js"></script>
+    <script src="shared-websocket.js"></script>
+    <script>
+        // Initialize shared WebSocket connection for this page
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('agentToken');
+            if (token && window.sharedWebSocket) {
+                fetch('/api/agent/validate', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.user) {
+                        window.sharedWebSocket.connect(data.user.id, token);
+                    }
+                })
+                .catch(console.error);
+            }
+        });
+    </script>
 </body>
 </html>

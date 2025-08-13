@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="agent-dashboard.css">
     <script src="agent-notifications.js"></script>
+    <script src="shared-websocket.js"></script>
 </head>
 <body>
     <!-- Login Form -->
@@ -241,63 +242,27 @@
 
             logout() {
                 localStorage.removeItem('agentToken');
-                if (this.ws) {
-                    this.ws.close();
-                }
+                window.sharedWebSocket.disconnect();
                 this.token = null;
                 this.user = null;
                 this.showLogin();
             }
 
             connectWebSocket() {
-                // Close existing connection if any
-                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    this.ws.close();
-                }
-
                 this.updateConnectionStatus('connecting', 'Connecting to server...');
-
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const hostname = window.location.hostname;
-                const wsUrl = window.location.protocol === 'https:' 
-                    ? `${protocol}//${hostname}` 
-                    : `${protocol}//${hostname}:3000`;
-                this.ws = new WebSocket(wsUrl);
-
-                this.ws.onopen = () => {
-                    this.ws.send(JSON.stringify({
-                        type: 'agent_join',
-                        agentId: this.user.id,
-                        token: this.token
-                    }));
-                };
-
-                this.ws.onmessage = (e) => {
-                    try {
-                        const data = JSON.parse(e.data);
-                        this.handleMessage(data);
-                    } catch (error) {
-                        console.error('Error parsing message:', error);
-                    }
-                };
-
-                this.ws.onclose = (e) => {
-                    this.updateConnectionStatus('disconnected', 'Connection lost - attempting to reconnect...');
-
-                    if (e.code === 1000) {
-                        this.logout();
-                        return;
-                    }
-
-                    setTimeout(() => this.connectWebSocket(), 3000);
-                };
-
-                this.ws.onerror = (err) => {
-                    console.error('WebSocket error:', err);
-                };
+                
+                // Use shared WebSocket service
+                window.sharedWebSocket.addMessageHandler(this.handleMessage.bind(this));
+                window.sharedWebSocket.connect(this.user.id, this.token);
             }
 
             handleMessage(data) {
+                // Handle connection status updates from shared service
+                if (data.type === 'connection_status') {
+                    this.updateConnectionStatus(data.status, data.message);
+                    return;
+                }
+                
                 switch(data.type) {
                     case 'agent_status':
                         this.updateConnectionStatus('connected', data.message);
@@ -414,11 +379,11 @@
                     this.addMessage('--- Live conversation starts here ---', 'system-msg');
                     this.updateStats({ activeChats: 1, queueCount: data.queuePosition || 0 });
                 } else {
-                    this.ws.send(JSON.stringify({
+                    window.sharedWebSocket.send({
                         type: 'accept_request',
                         sessionId: this.currentSession,
                         agentId: this.user.id
-                    }));
+                    });
                     
                     document.getElementById('notification').style.display = 'none';
                 }
@@ -456,11 +421,11 @@
                     return;
                 }
 
-                this.ws.send(JSON.stringify({
+                window.sharedWebSocket.send({
                     type: 'agent_message',
                     sessionId: this.currentSession,
                     message: message
-                }));
+                });
 
                 this.addMessage(`You: ${message}`, 'agent-msg');
                 input.value = '';
@@ -469,10 +434,10 @@
             endChat() {
                 if (!this.currentSession) return;
 
-                this.ws.send(JSON.stringify({
+                window.sharedWebSocket.send({
                     type: 'end_chat',
                     sessionId: this.currentSession
-                }));
+                });
 
                 this.currentSession = null;
 

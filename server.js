@@ -1535,6 +1535,11 @@ async function handleWebSocketMessage(ws, data) {
           console.log(`Satisfaction response saved for session ${data.sessionId}: ${data.rating}/5`);
         }
         break;
+      case 'agent_navigating':
+        // Handle agent navigation - keep connection alive
+        console.log(`Agent ${data.agentId} is navigating between pages`);
+        // Just acknowledge - don't close connection
+        break;
       default:
         console.log('Unknown message type:', data.type);
     }
