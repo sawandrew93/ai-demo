@@ -744,6 +744,7 @@
         }
     </script>
     <script src="agent-notifications.js"></script>
+    <script src="shared-notifications.js"></script>
     <script src="shared-websocket.js"></script>
     <script>
         // Initialize shared WebSocket connection for this page
@@ -758,6 +759,14 @@
                 .then(data => {
                     if (data.success && data.user) {
                         window.sharedWebSocket.connect(data.user.id, token);
+                        // Set current session if agent is busy
+                        if (window.sharedNotifications) {
+                            // Check if agent has active session
+                            const activeSession = localStorage.getItem('activeAgentSession');
+                            if (activeSession) {
+                                window.sharedNotifications.currentSession = activeSession;
+                            }
+                        }
                     }
                 })
                 .catch(console.error);

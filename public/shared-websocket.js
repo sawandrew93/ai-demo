@@ -133,6 +133,12 @@ class SharedWebSocketService {
     }
 
     notifyHandlers(data) {
+        // Handle notifications globally first
+        if (window.sharedNotifications) {
+            window.sharedNotifications.handleMessage(data);
+        }
+        
+        // Then notify page-specific handlers
         this.messageHandlers.forEach(handler => {
             try {
                 handler(data);

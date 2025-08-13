@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="agent-dashboard.css">
     <script src="agent-notifications.js"></script>
+    <script src="shared-notifications.js"></script>
     <script src="shared-websocket.js"></script>
 </head>
 <body>
@@ -254,6 +255,15 @@
                 // Use shared WebSocket service
                 window.sharedWebSocket.addMessageHandler(this.handleMessage.bind(this));
                 window.sharedWebSocket.connect(this.user.id, this.token);
+                
+                // Check for auto-accept session
+                setTimeout(() => {
+                    const autoAcceptSession = localStorage.getItem('autoAcceptSession');
+                    if (autoAcceptSession) {
+                        localStorage.removeItem('autoAcceptSession');
+                        this.acceptRequest(autoAcceptSession);
+                    }
+                }, 1000);
             }
 
             handleMessage(data) {
@@ -354,6 +364,9 @@
                 }
                 
                 if (!this.currentSession) return;
+                
+                // Store active session for other pages
+                localStorage.setItem('activeAgentSession', this.currentSession);
 
                 if (data) {
                     this.cannedResponses = data.cannedResponses || [];
@@ -439,6 +452,8 @@
                     sessionId: this.currentSession
                 });
 
+                // Clear active session
+                localStorage.removeItem('activeAgentSession');
                 this.currentSession = null;
 
                 document.getElementById('agent-input').disabled = true;
@@ -512,7 +527,8 @@
                     // Hide canned responses
                     document.getElementById('canned-responses').style.display = 'none';
                     
-                    // Clear current session
+                    // Clear active session
+                    localStorage.removeItem('activeAgentSession');
                     this.currentSession = null;
                     
                     // Update stats
