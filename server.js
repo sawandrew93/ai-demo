@@ -1187,15 +1187,7 @@ function handleAcceptRequest(sessionId, agentId) {
       sessionId,
       history: conversation.messages,
       queuePosition: 0,
-      cannedResponses: [
-        "Thank you for contacting us! How can I assist you today?",
-        "I understand your concern. Let me look into this for you right away.",
-        "Is there anything else I can help you with?",
-        "Let me transfer you to a specialist who can better assist you.",
-        "Thank you for your patience. I have the information you need.",
-        "I apologize for any inconvenience. Let me resolve this for you.",
-        "Your issue has been resolved. Is there anything else you need help with?"
-      ]
+
     }));
     console.log(`✅ Customer assigned message sent to agent ${agentData.user.name}`);
   } else {
