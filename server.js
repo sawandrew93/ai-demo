@@ -777,10 +777,14 @@ function handleAgentReconnection(agentId, ws, user) {
       }));
 
       if (conversation.customerWs && conversation.customerWs.readyState === WebSocket.OPEN) {
-        conversation.customerWs.send(JSON.stringify({
-          type: 'agent_reconnected',
-          message: `${user.name} has reconnected and is back online.`
-        }));
+        // Only send reconnection message if customer was notified of disconnection
+        const agentData = humanAgents.get(agentId);
+        if (agentData && !agentData.disconnectTimeout) {
+          conversation.customerWs.send(JSON.stringify({
+            type: 'agent_reconnected',
+            message: `${user.name} has reconnected and is back online.`
+          }));
+        }
       }
 
       console.log(`Agent ${user.name} (${agentId}) successfully reconnected to session ${previousSessionId}`);
@@ -1061,6 +1065,13 @@ async function handleAgentJoin(ws, data) {
     // If agent already exists, just update the WebSocket (don't create duplicate)
     if (humanAgents.has(agentId)) {
       const existingAgent = humanAgents.get(agentId);
+      
+      // Cancel disconnect timeout if agent reconnects quickly
+      if (existingAgent.disconnectTimeout) {
+        clearTimeout(existingAgent.disconnectTimeout);
+        delete existingAgent.disconnectTimeout;
+      }
+      
       existingAgent.ws = ws;
       console.log(`Updated WebSocket for existing agent ${user.name}`);
     } else {
@@ -1574,15 +1585,25 @@ wss.on('connection', (ws) => {
           if (conversation && conversation.hasHuman) {
             console.log(`Agent ${agentData.user.name} disconnected from session ${sessionId}`);
 
+            // Only show disconnection message after a delay to avoid tab switching notifications
+            const disconnectTimeout = setTimeout(() => {
+              if (conversation.customerWs && conversation.customerWs.readyState === WebSocket.OPEN) {
+                // Check if agent is still disconnected
+                const currentAgentData = humanAgents.get(agentId);
+                if (!currentAgentData || !currentAgentData.ws || currentAgentData.ws.readyState !== WebSocket.OPEN) {
+                  conversation.customerWs.send(JSON.stringify({
+                    type: 'agent_disconnected_temp',
+                    message: 'Your agent seems to have lost connection. They should be back shortly...'
+                  }));
+                }
+              }
+            }, 3000); // 3 second delay
+            
+            // Store timeout to cancel if agent reconnects quickly
+            agentData.disconnectTimeout = disconnectTimeout;
+
             if (!agentReconnectTimeouts.has(agentId)) {
               setupAgentReconnectTimeout(agentId, sessionId);
-            }
-
-            if (conversation.customerWs && conversation.customerWs.readyState === WebSocket.OPEN) {
-              conversation.customerWs.send(JSON.stringify({
-                type: 'agent_disconnected_temp',
-                message: 'Your agent seems to have lost connection. They should be back shortly...'
-              }));
             }
           }
         }
