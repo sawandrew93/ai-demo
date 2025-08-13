@@ -778,12 +778,13 @@ function handleAgentReconnection(agentId, ws, user) {
 
       if (conversation.customerWs && conversation.customerWs.readyState === WebSocket.OPEN) {
         // Only send reconnection message if customer was actually notified of disconnection
-        const agentData = humanAgents.get(agentId);
-        if (agentData && agentData.customerNotified) {
+        if (conversation.customerNotifiedOfDisconnect) {
           conversation.customerWs.send(JSON.stringify({
             type: 'agent_reconnected',
             message: `${user.name} has reconnected and is back online.`
           }));
+          // Reset the flag
+          conversation.customerNotifiedOfDisconnect = false;
         }
       }
 
@@ -1070,7 +1071,6 @@ async function handleAgentJoin(ws, data) {
       if (existingAgent.disconnectTimeout) {
         clearTimeout(existingAgent.disconnectTimeout);
         delete existingAgent.disconnectTimeout;
-        delete existingAgent.customerNotified; // Reset notification flag
       }
       
       existingAgent.ws = ws;
@@ -1596,8 +1596,8 @@ wss.on('connection', (ws) => {
                     type: 'agent_disconnected_temp',
                     message: 'Your agent seems to have lost connection. They should be back shortly...'
                   }));
-                  // Mark that customer was notified
-                  agentData.customerNotified = true;
+                  // Mark that customer was notified in conversation
+                  conversation.customerNotifiedOfDisconnect = true;
                 }
               }
             }, 3000); // 3 second delay
