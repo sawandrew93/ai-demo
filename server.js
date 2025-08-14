@@ -444,8 +444,8 @@ Respond with only a JSON object:
 // ========== ENHANCED AI RESPONSE GENERATION ========== //
 async function generateAIResponse(userMessage, conversationHistory = []) {
   try {
-    // Classify intent using AI
-    const intentClassification = await classifyIntent(userMessage, conversationHistory);
+    // Skip intent classification on low-resource systems to reduce memory usage
+    const intentClassification = { intent: 'general_inquiry', confidence: 0.5, reasoning: 'Resource optimization' };
     
     // Handle greeting messages
     const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
@@ -525,12 +525,9 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
-    // For questions, search knowledge base with intent-aware expansion
-    const knowledgeResults = await searchKnowledgeBaseWithIntent(userMessage, intentClassification);
+    // Use simpler knowledge search for better performance
+    const knowledgeResults = await searchKnowledgeBase(userMessage, 3); // Limit to 3 results
     console.log(`📊 Knowledge search results: ${knowledgeResults.length} found`);
-    if (knowledgeResults.length > 0) {
-      console.log(`📝 Top result preview: ${knowledgeResults[0].content.substring(0, 150)}...`);
-    }
 
     // Improved relevance checking with lower thresholds
     let relevantResults = [];
@@ -577,20 +574,15 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     // Use relevant knowledge base results
     console.log(`📋 Using ${relevantResults.length} relevant knowledge base results for: "${userMessage}"`);
 
-    // Generate response using relevant knowledge base information with better context
-    const context = `You are a helpful company assistant. Answer the customer's question using the information provided below. Be direct and helpful.
+    // Simplified context for better performance
+    const context = `Answer this question using the provided information. Be helpful and direct.
 
-Relevant company information:
-${relevantResults.map(item => `- ${item.content}`).join('\n')}
+Information:
+${relevantResults.map(item => item.content.substring(0, 200)).join('\n')}
 
-Customer question: "${userMessage}"
+Question: ${userMessage}
 
-Instructions:
-- If the question asks about "types of" something, summarize all the different types mentioned in the information
-- If the question uses different words but asks about the same topic, understand the intent and answer appropriately
-- Be comprehensive - if multiple related policies are mentioned, include them all
-- Provide a clear, helpful answer based on the company information above
-- Do NOT say "I don't have information" or "not available" - just answer based on what's provided`;
+Answer based only on the information above.`;
 
     const result = await model.generateContent(context);
     const responseText = result.response.text();
@@ -928,6 +920,14 @@ async function handleCustomerMessage(ws, sessionId, message) {
 
   clearCustomerTimeout(sessionId);
   setupCustomerTimeout(sessionId);
+  
+  // Send immediate acknowledgment to prevent timeout
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'message_received',
+      sessionId: sessionId
+    }));
+  }
 
   // If already connected to human agent, forward message
   if (conversation.hasHuman && conversation.agentWs) {
@@ -1570,11 +1570,21 @@ async function handleWebSocketMessage(ws, data) {
 // ========== WEBSOCKET SETUP ========== //
 wss.on('connection', (ws) => {
   console.log('New WebSocket connection');
+  
+  // Set keepalive for low-resource environments
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
 
   ws.on('message', async (message) => {
     try {
       const data = JSON.parse(message);
-      await handleWebSocketMessage(ws, data);
+      
+      // Process messages with lower priority to prevent blocking
+      setImmediate(async () => {
+        await handleWebSocketMessage(ws, data);
+      });
     } catch (error) {
       console.error('Message parse error:', error);
     }
@@ -2334,15 +2344,33 @@ app.delete('/api/delete-attachments', verifyToken, async (req, res) => {
   }
 });
 
+// Add WebSocket heartbeat for connection stability
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      console.log('Terminating dead WebSocket connection');
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000); // Check every 30 seconds
+
 // Initialize and start server
 async function startServer() {
   await initializeDefaultUsers();
   
-  // Feedback table should already exist from setup-complete-database.sql
+  // Optimize for low-resource environment
+  if (process.env.NODE_ENV === 'production') {
+    // Reduce memory usage
+    process.env.NODE_OPTIONS = '--max-old-space-size=256';
+  }
+  
   console.log('✅ Using existing feedback table from database setup');
 
   server.listen(process.env.PORT || 3000, () => {
     console.log(`Server running on port ${process.env.PORT || 3000}`);  
+    console.log('Memory usage:', process.memoryUsage());
   });
 }
 

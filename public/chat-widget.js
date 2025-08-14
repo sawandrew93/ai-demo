@@ -991,6 +991,10 @@
       const { type, message } = data;
 
       switch (type) {
+        case 'message_received':
+          // Server acknowledged message receipt - prevents timeout
+          console.log('Message acknowledged by server');
+          break;
         case 'session_restored':
           console.log('Session restored:', data);
           if (data.isConnectedToHuman) {
