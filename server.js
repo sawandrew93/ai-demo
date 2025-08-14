@@ -444,8 +444,8 @@ Respond with only a JSON object:
 // ========== ENHANCED AI RESPONSE GENERATION ========== //
 async function generateAIResponse(userMessage, conversationHistory = []) {
   try {
-    // Skip intent classification on low-resource systems to reduce memory usage
-    const intentClassification = { intent: 'general_inquiry', confidence: 0.5, reasoning: 'Resource optimization' };
+    // Classify intent using AI
+    const intentClassification = await classifyIntent(userMessage, conversationHistory);
     
     // Handle greeting messages
     const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
@@ -525,9 +525,12 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
       };
     }
 
-    // Use simpler knowledge search for better performance
-    const knowledgeResults = await searchKnowledgeBase(userMessage, 3); // Limit to 3 results
+    // For questions, search knowledge base with intent-aware expansion
+    const knowledgeResults = await searchKnowledgeBaseWithIntent(userMessage, intentClassification);
     console.log(`📊 Knowledge search results: ${knowledgeResults.length} found`);
+    if (knowledgeResults.length > 0) {
+      console.log(`📝 Top result preview: ${knowledgeResults[0].content.substring(0, 150)}...`);
+    }
 
     // Improved relevance checking with lower thresholds
     let relevantResults = [];
@@ -547,7 +550,7 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     // If no relevant knowledge found, try one more search with original query
     if (relevantResults.length === 0 && knowledgeResults.length === 0) {
       console.log(`🔄 No results found, trying fallback search: "${userMessage}"`);
-      const originalResults = await searchKnowledgeBase(userMessage, 3);
+      const originalResults = await searchKnowledgeBase(userMessage, 5);
       if (originalResults.length > 0) {
         relevantResults = originalResults.filter(r => r.similarity > 0.2);
       }
@@ -574,15 +577,20 @@ async function generateAIResponse(userMessage, conversationHistory = []) {
     // Use relevant knowledge base results
     console.log(`📋 Using ${relevantResults.length} relevant knowledge base results for: "${userMessage}"`);
 
-    // Simplified context for better performance
-    const context = `Answer this question using the provided information. Be helpful and direct.
+    // Generate response using relevant knowledge base information with better context
+    const context = `You are a helpful company assistant. Answer the customer's question using the information provided below. Be direct and helpful.
 
-Information:
-${relevantResults.map(item => item.content.substring(0, 200)).join('\n')}
+Relevant company information:
+${relevantResults.map(item => `- ${item.content}`).join('\n')}
 
-Question: ${userMessage}
+Customer question: "${userMessage}"
 
-Answer based only on the information above.`;
+Instructions:
+- If the question asks about "types of" something, summarize all the different types mentioned in the information
+- If the question uses different words but asks about the same topic, understand the intent and answer appropriately
+- Be comprehensive - if multiple related policies are mentioned, include them all
+- Provide a clear, helpful answer based on the company information above
+- Do NOT say "I don't have information" or "not available" - just answer based on what's provided`;
 
     const result = await model.generateContent(context);
     const responseText = result.response.text();

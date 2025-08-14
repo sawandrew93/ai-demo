@@ -25,10 +25,9 @@
       this.customerInfo = null;
       this.hasCollectedInfo = false;
 
-      // For testing - clear localStorage to always show dialog
-      // Remove this in production
-      localStorage.removeItem('chat_customer_info');
-      localStorage.removeItem('chat_info_collected');
+      // Keep customer info persistent across browser refreshes
+      // localStorage.removeItem('chat_customer_info');
+      // localStorage.removeItem('chat_info_collected');
 
       this.init();
     }
