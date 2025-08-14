@@ -1555,6 +1555,10 @@ async function handleWebSocketMessage(ws, data) {
           }, 10000); // 10 seconds
         }
         break;
+      case 'ping':
+        // Respond to ping with pong
+        ws.send(JSON.stringify({ type: 'pong' }));
+        break;
       default:
         console.log('Unknown message type:', data.type);
     }

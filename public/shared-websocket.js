@@ -10,6 +10,8 @@ class SharedWebSocketService {
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 3000;
         this.isIntentionalClose = false;
+        this.pingInterval = null;
+        this.pongTimeout = null;
     }
 
     connect(agentId, token) {
@@ -66,11 +68,24 @@ class SharedWebSocketService {
                 status: 'connected',
                 message: 'Connected to server'
             });
+            
+            // Start health monitoring
+            this.startHealthMonitoring();
         };
 
         this.ws.onmessage = (e) => {
             try {
                 const data = JSON.parse(e.data);
+                
+                // Handle pong response
+                if (data.type === 'pong') {
+                    if (this.pongTimeout) {
+                        clearTimeout(this.pongTimeout);
+                        this.pongTimeout = null;
+                    }
+                    return;
+                }
+                
                 this.notifyHandlers(data);
             } catch (error) {
                 console.error('SharedWebSocket: Error parsing message:', error);
@@ -170,12 +185,43 @@ class SharedWebSocketService {
 
     disconnect() {
         this.isIntentionalClose = true;
+        this.stopHealthMonitoring();
         if (this.ws) {
             this.ws.close();
         }
         this.messageHandlers.clear();
         this.agentId = null;
         this.token = null;
+    }
+    
+    startHealthMonitoring() {
+        this.stopHealthMonitoring();
+        
+        // Send ping every 30 seconds
+        this.pingInterval = setInterval(() => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({ type: 'ping' }));
+                
+                // Set timeout for pong response
+                this.pongTimeout = setTimeout(() => {
+                    console.log('SharedWebSocket: Pong timeout, connection may be dead');
+                    if (this.ws) {
+                        this.ws.close();
+                    }
+                }, 10000); // 10 second timeout
+            }
+        }, 30000);
+    }
+    
+    stopHealthMonitoring() {
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
+        }
+        if (this.pongTimeout) {
+            clearTimeout(this.pongTimeout);
+            this.pongTimeout = null;
+        }
     }
 
     getConnectionStatus() {

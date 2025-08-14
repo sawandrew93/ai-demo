@@ -898,13 +898,26 @@
         return;
       }
       
+      // Close existing connection if any
+      if (this.ws) {
+        this.ws.close();
+        this.ws = null;
+      }
+      
       this.ws = new WebSocket(wsUrl);
+      this.messageQueue = this.messageQueue || [];
 
       this.ws.onopen = () => {
         console.log('WebSocket connected successfully');
         this.reconnectAttempts = 0;
         this.updateConnectionStatus('Connected', this.isConnectedToHuman ? 'Human Agent' : 'AI Assistant');
         this.requestSessionRestore();
+        
+        // Send queued messages
+        while (this.messageQueue.length > 0) {
+          const queuedMessage = this.messageQueue.shift();
+          this.ws.send(JSON.stringify(queuedMessage));
+        }
       };
 
       this.ws.onmessage = (event) => {
@@ -920,8 +933,8 @@
       this.ws.onclose = (event) => {
         console.log('WebSocket disconnected. Code:', event.code, 'Reason:', event.reason);
         
-        // Don't show connection lost message for normal closure or if we haven't sent any messages yet
-        if (event.code === 1000 || this.messages.length <= 1) {
+        // Don't reconnect for normal closure
+        if (event.code === 1000) {
           return;
         }
         
@@ -929,15 +942,19 @@
 
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts++;
-          const delay = Math.min(1000 * this.reconnectAttempts, 10000);
+          const delay = Math.min(2000 * Math.pow(1.5, this.reconnectAttempts - 1), 15000);
 
           setTimeout(() => {
+            if (!this.customerInfo) {
+              console.log('No customer info available for reconnection');
+              return;
+            }
             console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
             this.updateConnectionStatus('Reconnecting...', `Attempt ${this.reconnectAttempts}`);
             this.connectWebSocket();
           }, delay);
         } else {
-          this.updateConnectionStatus('Connection Failed', 'Max reconnection attempts reached');
+          this.updateConnectionStatus('Connection Failed', 'Please refresh to continue');
           this.addMessage('Connection lost. Please refresh the page to continue.', 'system');
         }
       };
@@ -949,7 +966,7 @@
     }
 
     requestSessionRestore() {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN && this.customerInfo) {
         this.ws.send(JSON.stringify({
           type: 'restore_session',
           sessionId: this.sessionId,
@@ -957,18 +974,16 @@
           timestamp: Date.now()
         }));
         
-        // Also send customer info separately if available
-        if (this.customerInfo) {
-          setTimeout(() => {
-            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-              this.ws.send(JSON.stringify({
-                type: 'customer_info_submitted',
-                sessionId: this.sessionId,
-                customerInfo: this.customerInfo
-              }));
-            }
-          }, 500);
-        }
+        // Send customer info to ensure server has it
+        setTimeout(() => {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+              type: 'customer_info_submitted',
+              sessionId: this.sessionId,
+              customerInfo: this.customerInfo
+            }));
+          }
+        }, 200);
       }
     }
 
@@ -1151,15 +1166,21 @@
         this.showTypingIndicator();
       }
 
+      const messageData = {
+        type: 'customer_message',
+        sessionId: this.sessionId,
+        message: message
+      };
+
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({
-          type: 'customer_message',
-          sessionId: this.sessionId,
-          message: message
-        }));
+        this.ws.send(JSON.stringify(messageData));
       } else {
+        // Queue message and try to reconnect
+        this.messageQueue = this.messageQueue || [];
+        this.messageQueue.push(messageData);
         this.hideTypingIndicator();
-        this.addMessage('Connection lost. Trying to reconnect...', 'system');
+        this.addMessage('Reconnecting...', 'system');
+        this.connectWebSocket();
       }
     }
 
