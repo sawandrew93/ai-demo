@@ -751,26 +751,30 @@
         // Initialize shared WebSocket connection for this page
         document.addEventListener('DOMContentLoaded', () => {
             const token = localStorage.getItem('agentToken');
-            if (token && window.sharedWebSocket) {
-                // Get user info from token or make a request
+            if (token) {
+                // Validate token and connect
                 fetch('/api/agent/validate', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        localStorage.removeItem('agentToken');
+                        window.location.href = '/agent';
+                        return;
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    if (data.success && data.user) {
+                    if (data && data.success && data.user && window.sharedWebSocket) {
                         window.sharedWebSocket.connect(data.user.id, token);
-                        // Set current session if agent is busy
-                        if (window.sharedNotifications) {
-                            // Check if agent has active session
-                            const activeSession = localStorage.getItem('activeAgentSession');
-                            if (activeSession) {
-                                window.sharedNotifications.currentSession = activeSession;
-                            }
-                        }
                     }
                 })
-                .catch(console.error);
+                .catch(() => {
+                    localStorage.removeItem('agentToken');
+                    window.location.href = '/agent';
+                });
+            } else {
+                window.location.href = '/agent';
             }
         });
     </script>

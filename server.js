@@ -1058,29 +1058,29 @@ async function handleAgentJoin(ws, data) {
     return;
   }
 
-  console.log(`Agent ${user.name} (${user.username}) attempting to connect`);
+  console.log(`Agent ${user.name} joining/rejoining`);
 
   const wasReconnected = handleAgentReconnection(agentId, ws, user);
 
   if (!wasReconnected) {
-    // If agent already exists, just update the WebSocket (don't create duplicate)
     if (humanAgents.has(agentId)) {
       const existingAgent = humanAgents.get(agentId);
       
-      // Cancel disconnect timeout if agent reconnects quickly
       if (existingAgent.disconnectTimeout) {
         clearTimeout(existingAgent.disconnectTimeout);
         delete existingAgent.disconnectTimeout;
       }
       
       existingAgent.ws = ws;
+      existingAgent.isNavigating = false;
       console.log(`Updated WebSocket for existing agent ${user.name}`);
     } else {
       humanAgents.set(agentId, {
         ws,
         user,
         status: 'online',
-        sessionId: null
+        sessionId: null,
+        isNavigating: false
       });
     }
   }

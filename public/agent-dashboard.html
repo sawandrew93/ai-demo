@@ -171,10 +171,12 @@
                         this.showDashboard();
                         this.connectWebSocket();
                     } else {
+                        this.token = null;
                         localStorage.removeItem('agentToken');
                         this.showLogin();
                     }
                 } catch (error) {
+                    this.token = null;
                     localStorage.removeItem('agentToken');
                     this.showLogin();
                 }

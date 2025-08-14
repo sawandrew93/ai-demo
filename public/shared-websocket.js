@@ -18,11 +18,16 @@ class SharedWebSocketService {
         this.isIntentionalClose = false;
         
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            console.log('SharedWebSocket: Already connected, skipping');
-            return; // Already connected
+            console.log('SharedWebSocket: Already connected');
+            // Send agent_join to ensure server knows we're still here
+            this.ws.send(JSON.stringify({
+                type: 'agent_join',
+                agentId: this.agentId,
+                token: this.token
+            }));
+            return;
         }
 
-        // Clear any existing connection first
         if (this.ws) {
             this.ws.close();
             this.ws = null;
@@ -185,14 +190,11 @@ class SharedWebSocketService {
 // Create global instance
 window.sharedWebSocket = new SharedWebSocketService();
 
-// Handle page navigation properly
+// Handle page navigation - don't close connection
 window.addEventListener('beforeunload', function(e) {
-    // Mark as intentional close to prevent reconnection during navigation
     if (window.sharedWebSocket && window.sharedWebSocket.isConnected()) {
-        console.log('SharedWebSocket: Page unloading, marking as intentional close');
-        window.sharedWebSocket.isIntentionalClose = true;
-        
-        // Send navigation message
+        console.log('SharedWebSocket: Page navigating, keeping connection alive');
+        // Don't mark as intentional close for navigation
         window.sharedWebSocket.send({
             type: 'agent_navigating',
             agentId: window.sharedWebSocket.agentId
