@@ -1650,32 +1650,48 @@ wss.on('connection', (ws) => {
       }
     }
 
-    // Clean up disconnected customers
+    // Clean up disconnected customers with delay to distinguish refresh from actual disconnect
     for (const [sessionId, conversation] of conversations) {
       if (conversation.customerWs === ws) {
-        console.log(`Customer ${sessionId} disconnected`);
+        console.log(`Customer ${sessionId} WebSocket closed`);
 
-        clearCustomerTimeout(sessionId);
-        clearCustomerIdleTimeout(sessionId);
+        // Set a timeout to detect if this is a refresh or actual disconnect
+        setTimeout(() => {
+          const currentConversation = conversations.get(sessionId);
+          if (!currentConversation || currentConversation.customerWs === ws) {
+            console.log(`Customer ${sessionId} actually disconnected (not just refresh)`);
+            
+            clearCustomerTimeout(sessionId);
+            clearCustomerIdleTimeout(sessionId);
 
-        const queueIndex = waitingQueue.indexOf(sessionId);
-        if (queueIndex > -1) {
-          waitingQueue.splice(queueIndex, 1);
+            const queueIndex = waitingQueue.indexOf(sessionId);
+            if (queueIndex > -1) {
+              waitingQueue.splice(queueIndex, 1);
 
-          humanAgents.forEach((agentData, agentId) => {
-            if (agentData.ws && agentData.ws.readyState === WebSocket.OPEN) {
-              agentData.ws.send(JSON.stringify({
-                type: 'customer_left_queue',
-                sessionId,
-                remainingQueue: waitingQueue.length
-              }));
+              humanAgents.forEach((agentData, agentId) => {
+                if (agentData.ws && agentData.ws.readyState === WebSocket.OPEN) {
+                  agentData.ws.send(JSON.stringify({
+                    type: 'customer_left_queue',
+                    sessionId,
+                    remainingQueue: waitingQueue.length
+                  }));
+                }
+              });
             }
-          });
-        }
 
-        if (conversation.hasHuman) {
-          saveChatHistory(sessionId, 'customer_disconnected');
-        }
+            // Notify agent if customer was connected to human
+            if (currentConversation && currentConversation.hasHuman && currentConversation.agentWs) {
+              if (currentConversation.agentWs.readyState === WebSocket.OPEN) {
+                currentConversation.agentWs.send(JSON.stringify({
+                  type: 'customer_disconnected',
+                  sessionId,
+                  message: 'Customer has left the chat.'
+                }));
+              }
+              saveChatHistory(sessionId, 'customer_disconnected');
+            }
+          }
+        }, 5000); // 5 second delay to allow for page refresh reconnection
 
         break;
       }

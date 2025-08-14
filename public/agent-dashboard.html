@@ -327,6 +327,13 @@
                     case 'session_ended_by_customer':
                         this.handleSessionEndedByCustomer(data);
                         break;
+                    case 'customer_disconnected':
+                        this.addMessage('⚠️ Customer has left the chat.', 'system-msg');
+                        // Disable input controls
+                        document.getElementById('agent-input').disabled = true;
+                        document.getElementById('send-btn').disabled = true;
+                        document.getElementById('end-chat-btn').disabled = true;
+                        break;
                     case 'session_no_longer_active':
                         this.handleSessionNoLongerActive(data);
                         break;

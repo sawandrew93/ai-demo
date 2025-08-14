@@ -68,16 +68,20 @@
       try {
         const savedInfo = localStorage.getItem('chat_customer_info');
         const infoCollected = localStorage.getItem('chat_info_collected');
+        console.log('Loading customer info - savedInfo:', !!savedInfo, 'infoCollected:', infoCollected);
+        
         if (savedInfo && infoCollected === 'true') {
           this.customerInfo = JSON.parse(savedInfo);
           this.hasCollectedInfo = true;
-          console.log('Loaded customer info:', this.customerInfo);
+          console.log('✅ Loaded customer info:', this.customerInfo);
         } else {
-          console.log('No customer info found, will show dialog');
+          console.log('❌ No customer info found, will show dialog');
+          this.hasCollectedInfo = false;
         }
       } catch (error) {
         console.error('Error loading customer info:', error);
         this.hasCollectedInfo = false;
+        this.customerInfo = null;
       }
     }
 
@@ -140,7 +144,9 @@
       // Always show the chat interface first
       this.restoreMessages();
       
-      if (!this.hasCollectedInfo) {
+      console.log('Init - hasCollectedInfo:', this.hasCollectedInfo, 'customerInfo:', this.customerInfo);
+      
+      if (!this.hasCollectedInfo || !this.customerInfo) {
         // Show customer info dialog immediately after widget is created
         setTimeout(() => {
           this.showCustomerInfoDialog();
