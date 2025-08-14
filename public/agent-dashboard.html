@@ -7,6 +7,7 @@
     <script src="agent-notifications.js"></script>
     <script src="shared-notifications.js"></script>
     <script src="shared-websocket.js"></script>
+    <script src="connection-debug.js"></script>
 </head>
 <body>
     <!-- Login Form -->
@@ -87,12 +88,11 @@
     <script>
         class AgentDashboard {
             constructor() {
-                this.ws = null;
                 this.currentSession = null;
                 this.connectionStatus = 'disconnected';
                 this.user = null;
                 this.token = null;
-
+                this.messageHandler = null;
 
                 this.init();
             }
@@ -241,17 +241,35 @@
 
             logout() {
                 localStorage.removeItem('agentToken');
+                
+                // Clean up message handler
+                if (this.messageHandler) {
+                    window.sharedWebSocket.removeMessageHandler(this.messageHandler);
+                    this.messageHandler = null;
+                }
+                
+                // Disconnect shared WebSocket
                 window.sharedWebSocket.disconnect();
+                
                 this.token = null;
                 this.user = null;
+                this.currentSession = null;
                 this.showLogin();
             }
 
             connectWebSocket() {
                 this.updateConnectionStatus('connecting', 'Connecting to server...');
                 
-                // Use shared WebSocket service
-                window.sharedWebSocket.addMessageHandler(this.handleMessage.bind(this));
+                // Clear any existing handlers first
+                if (this.messageHandler) {
+                    window.sharedWebSocket.removeMessageHandler(this.messageHandler);
+                }
+                
+                // Create bound handler and store reference
+                this.messageHandler = this.handleMessage.bind(this);
+                window.sharedWebSocket.addMessageHandler(this.messageHandler);
+                
+                // Connect using shared service
                 window.sharedWebSocket.connect(this.user.id, this.token);
                 
                 // Check for auto-accept session

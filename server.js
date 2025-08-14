@@ -1542,7 +1542,18 @@ async function handleWebSocketMessage(ws, data) {
       case 'agent_navigating':
         // Handle agent navigation - keep connection alive
         console.log(`Agent ${data.agentId} is navigating between pages`);
-        // Just acknowledge - don't close connection
+        
+        // Find the agent and mark as navigating to prevent timeout
+        const navigatingAgent = humanAgents.get(data.agentId);
+        if (navigatingAgent) {
+          navigatingAgent.isNavigating = true;
+          // Clear navigation flag after a reasonable time
+          setTimeout(() => {
+            if (navigatingAgent) {
+              navigatingAgent.isNavigating = false;
+            }
+          }, 10000); // 10 seconds
+        }
         break;
       default:
         console.log('Unknown message type:', data.type);
@@ -1573,6 +1584,13 @@ wss.on('connection', (ws) => {
       if (agentData.ws === ws) {
         const sessionId = agentSessions.get(agentId);
 
+        // Don't treat navigation as a real disconnection
+        if (agentData.isNavigating) {
+          console.log(`Agent ${agentData.user.name} disconnected during navigation - not treating as error`);
+          agentData.ws = null;
+          break;
+        }
+
         if (sessionId) {
           const conversation = conversations.get(sessionId);
           if (conversation && conversation.hasHuman) {
@@ -1592,7 +1610,7 @@ wss.on('connection', (ws) => {
                   conversation.customerNotifiedOfDisconnect = true;
                 }
               }
-            }, 3000); // 3 second delay
+            }, 5000); // 5 second delay for better stability
             
             // Store timeout to cancel if agent reconnects quickly
             agentData.disconnectTimeout = disconnectTimeout;

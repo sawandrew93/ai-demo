@@ -1,16 +1,16 @@
-// Agent notification service for secondary pages
+// Agent notification service for secondary pages - uses shared WebSocket
 class AgentSoundService {
     constructor() {
-        this.ws = null;
         this.token = localStorage.getItem('agentToken');
         this.user = null;
         
+        // Only initialize on non-agent pages and if we have a token
         if (this.token && window.location.pathname !== '/agent') {
-            this.validateAndConnect();
+            this.validateAndSetupNotifications();
         }
     }
 
-    async validateAndConnect() {
+    async validateAndSetupNotifications() {
         try {
             const response = await fetch('/api/agent/validate', {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -18,31 +18,30 @@ class AgentSoundService {
             if (response.ok) {
                 const data = await response.json();
                 this.user = data.user;
-                this.connectWebSocket();
+                this.setupSharedWebSocketListener();
             }
         } catch (error) {
             console.error('Agent validation failed:', error);
         }
     }
 
-    connectWebSocket() {
-        const wsUrl = `ws://${window.location.host}`;
-        this.ws = new WebSocket(wsUrl);
-
-        this.ws.onopen = () => {
-            this.ws.send(JSON.stringify({
-                type: 'agent_join',
-                agentId: this.user.id,
-                token: this.token
-            }));
-        };
-
-        this.ws.onmessage = (e) => {
-            const data = JSON.parse(e.data);
-            if (data.type === 'pending_request') {
-                this.showNotification(data);
+    setupSharedWebSocketListener() {
+        // Use the shared WebSocket service instead of creating a new connection
+        if (window.sharedWebSocket && this.user) {
+            console.log('AgentSoundService: Setting up shared WebSocket listener');
+            
+            // Add message handler to shared service
+            window.sharedWebSocket.addMessageHandler((data) => {
+                if (data.type === 'pending_request') {
+                    this.showNotification(data);
+                }
+            });
+            
+            // Connect if not already connected
+            if (!window.sharedWebSocket.isConnected()) {
+                window.sharedWebSocket.connect(this.user.id, this.token);
             }
-        };
+        }
     }
 
     showNotification(data) {
@@ -91,5 +90,14 @@ class AgentSoundService {
 
 }
 
-// Global instance for sound only
-window.agentSoundService = new AgentSoundService();
+// Initialize sound service after shared WebSocket is loaded
+if (typeof window.sharedWebSocket !== 'undefined') {
+    window.agentSoundService = new AgentSoundService();
+} else {
+    // Wait for shared WebSocket to load
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(() => {
+            window.agentSoundService = new AgentSoundService();
+        }, 100);
+    });
+}

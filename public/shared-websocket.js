@@ -18,7 +18,14 @@ class SharedWebSocketService {
         this.isIntentionalClose = false;
         
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            console.log('SharedWebSocket: Already connected, skipping');
             return; // Already connected
+        }
+
+        // Clear any existing connection first
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
         }
 
         this.createConnection();
@@ -70,27 +77,31 @@ class SharedWebSocketService {
             this.connectionStatus = 'disconnected';
 
             if (this.isIntentionalClose) {
+                console.log('SharedWebSocket: Intentional close, not reconnecting');
                 return; // Don't reconnect if intentionally closed
             }
 
-            if (e.code === 1000) {
-                // Normal closure, likely logout
+            if (e.code === 1000 || e.code === 1001) {
+                // Normal closure or going away (page navigation)
+                console.log('SharedWebSocket: Normal closure, not reconnecting');
                 this.notifyHandlers({
                     type: 'connection_status',
                     status: 'disconnected',
-                    message: 'Logged out'
+                    message: 'Connection closed'
                 });
                 return;
             }
 
-            // Attempt to reconnect
-            this.notifyHandlers({
-                type: 'connection_status',
-                status: 'reconnecting',
-                message: 'Connection lost - attempting to reconnect...'
-            });
-
-            this.attemptReconnect();
+            // Only reconnect for unexpected closures
+            if (e.code !== 1005 && e.code !== 1006) {
+                console.log('SharedWebSocket: Unexpected closure, attempting reconnect');
+                this.notifyHandlers({
+                    type: 'connection_status',
+                    status: 'reconnecting',
+                    message: 'Connection lost - attempting to reconnect...'
+                });
+                this.attemptReconnect();
+            }
         };
 
         this.ws.onerror = (err) => {
@@ -100,6 +111,7 @@ class SharedWebSocketService {
 
     attemptReconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.log('SharedWebSocket: Max reconnect attempts reached');
             this.notifyHandlers({
                 type: 'connection_status',
                 status: 'failed',
@@ -109,11 +121,14 @@ class SharedWebSocketService {
         }
 
         this.reconnectAttempts++;
+        console.log(`SharedWebSocket: Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+        
         setTimeout(() => {
-            if (!this.isIntentionalClose) {
+            if (!this.isIntentionalClose && this.agentId && this.token) {
+                console.log('SharedWebSocket: Attempting to reconnect...');
                 this.createConnection();
             }
-        }, this.reconnectDelay);
+        }, this.reconnectDelay * this.reconnectAttempts); // Exponential backoff
     }
 
     send(data) {
@@ -170,11 +185,14 @@ class SharedWebSocketService {
 // Create global instance
 window.sharedWebSocket = new SharedWebSocketService();
 
-// Keep connection alive when navigating between pages
+// Handle page navigation properly
 window.addEventListener('beforeunload', function(e) {
-    // Don't close WebSocket on page navigation within same domain
+    // Mark as intentional close to prevent reconnection during navigation
     if (window.sharedWebSocket && window.sharedWebSocket.isConnected()) {
-        // Send keep-alive message instead of closing
+        console.log('SharedWebSocket: Page unloading, marking as intentional close');
+        window.sharedWebSocket.isIntentionalClose = true;
+        
+        // Send navigation message
         window.sharedWebSocket.send({
             type: 'agent_navigating',
             agentId: window.sharedWebSocket.agentId
@@ -182,22 +200,30 @@ window.addEventListener('beforeunload', function(e) {
     }
 });
 
-// Reconnect when returning to any page
-window.addEventListener('focus', function() {
-    if (window.sharedWebSocket && !window.sharedWebSocket.isConnected()) {
-        const token = localStorage.getItem('agentToken');
-        if (token && window.sharedWebSocket.agentId) {
-            window.sharedWebSocket.connect(window.sharedWebSocket.agentId, token);
-        }
-    }
-});
-
-// Handle page visibility changes
+// Reconnect when page becomes visible (but not on every focus)
+let reconnectTimeout = null;
 document.addEventListener('visibilitychange', function() {
-    if (!document.hidden && window.sharedWebSocket && !window.sharedWebSocket.isConnected()) {
-        const token = localStorage.getItem('agentToken');
-        if (token && window.sharedWebSocket.agentId) {
-            window.sharedWebSocket.connect(window.sharedWebSocket.agentId, token);
+    if (!document.hidden && window.sharedWebSocket) {
+        // Clear any pending reconnect
+        if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = null;
+        }
+        
+        // Only reconnect if truly disconnected and we have credentials
+        if (!window.sharedWebSocket.isConnected()) {
+            const token = localStorage.getItem('agentToken');
+            if (token && window.sharedWebSocket.agentId) {
+                console.log('SharedWebSocket: Page visible, reconnecting...');
+                // Reset intentional close flag
+                window.sharedWebSocket.isIntentionalClose = false;
+                window.sharedWebSocket.reconnectAttempts = 0;
+                
+                // Delay reconnection slightly to avoid rapid reconnects
+                reconnectTimeout = setTimeout(() => {
+                    window.sharedWebSocket.connect(window.sharedWebSocket.agentId, token);
+                }, 500);
+            }
         }
     }
 });
