@@ -1568,11 +1568,9 @@
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const hostname = window.location.hostname;
     
-    // For HTTPS production, use same domain (Nginx proxy)
-    // For local development, use port 3000
-    const serverUrl = window.location.protocol === 'https:' 
-      ? `${protocol}//${hostname}` 
-      : `${protocol}//${hostname}:3000`;
+    // Use same port as current page for Docker compatibility
+    const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+    const serverUrl = `${protocol}//${hostname}${port && port !== '80' && port !== '443' ? ':' + port : ''}`;
 
     const defaultConfig = {
       serverUrl: serverUrl,

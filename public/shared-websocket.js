@@ -45,9 +45,8 @@ class SharedWebSocketService {
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const hostname = window.location.hostname;
-        const wsUrl = window.location.protocol === 'https:' 
-            ? `${protocol}//${hostname}` 
-            : `${protocol}//${hostname}:3000`;
+        const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+        const wsUrl = `${protocol}//${hostname}${port && port !== '80' && port !== '443' ? ':' + port : ''}`;
 
         this.ws = new WebSocket(wsUrl);
 

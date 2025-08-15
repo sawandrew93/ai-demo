@@ -2380,8 +2380,42 @@ const heartbeatInterval = setInterval(() => {
   });
 }, 30000); // Check every 30 seconds
 
+// Handle server shutdown gracefully
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  clearInterval(heartbeatInterval);
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  clearInterval(heartbeatInterval);
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+// Environment validation
+function validateEnvironment() {
+  const required = ['GEMINI_API_KEY', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'JWT_SECRET'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.error('❌ Missing required environment variables:', missing.join(', '));
+    console.error('Please check your .env file and ensure all required variables are set.');
+    process.exit(1);
+  }
+  
+  console.log('✅ Environment validation passed');
+}
+
 // Initialize and start server
 async function startServer() {
+  validateEnvironment();
   await initializeDefaultUsers();
   
   // Optimize for low-resource environment
@@ -2392,9 +2426,12 @@ async function startServer() {
   
   console.log('✅ Using existing feedback table from database setup');
 
-  server.listen(process.env.PORT || 3000, () => {
-    console.log(`Server running on port ${process.env.PORT || 3000}`);  
-    console.log('Memory usage:', process.memoryUsage());
+  const port = process.env.PORT || 3000;
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${port}`);
+    console.log(`🌐 WebSocket server ready`);
+    console.log(`📊 Memory usage:`, process.memoryUsage());
+    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 }
 
