@@ -2341,8 +2341,9 @@ async function startServer() {
   // Feedback table should already exist from setup-complete-database.sql
   console.log('✅ Using existing feedback table from database setup');
 
-  server.listen(process.env.PORT || 3000, () => {
-    console.log(`Server running on port ${process.env.PORT || 3000}`);  
+  const port = process.env.PORT || 443;
+  server.listen(port, () => {
+    console.log(`Server running on port ${port}`);  
   });
 }
 
