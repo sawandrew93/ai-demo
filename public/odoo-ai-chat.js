@@ -20,6 +20,33 @@ class OdooAIChat {
             }
         };
         checkOdoo();
+        
+        // Force show chat widget even when no agents online
+        this.forceShowWidget();
+    }
+
+    forceShowWidget() {
+        const forceShow = () => {
+            const chatButton = document.querySelector('.o_livechat_button');
+            if (chatButton) {
+                chatButton.style.display = 'block !important';
+                chatButton.style.visibility = 'visible !important';
+            }
+            
+            // Override Odoo's hide logic
+            if (window.odoo && window.odoo.im_livechat) {
+                const originalHide = window.odoo.im_livechat.LivechatButton.prototype.hide;
+                if (originalHide) {
+                    window.odoo.im_livechat.LivechatButton.prototype.hide = function() {
+                        // Don't hide - keep widget visible
+                        console.log('Preventing Odoo chat widget from hiding');
+                    };
+                }
+            }
+            
+            setTimeout(forceShow, 2000);
+        };
+        forceShow();
     }
 
     setupOdooIntegration() {
@@ -29,11 +56,34 @@ class OdooAIChat {
         const waitForWidget = () => {
             if (window.odoo.im_livechat.LivechatButton) {
                 this.interceptOdooMessages();
+                this.ensureWidgetAlwaysVisible();
             } else {
                 setTimeout(waitForWidget, 500);
             }
         };
         waitForWidget();
+    }
+
+    ensureWidgetAlwaysVisible() {
+        // Override Odoo's availability check
+        if (window.odoo && window.odoo.im_livechat && window.odoo.im_livechat.LivechatButton) {
+            const prototype = window.odoo.im_livechat.LivechatButton.prototype;
+            
+            // Override the _isAvailable method to always return true
+            if (prototype._isAvailable) {
+                prototype._isAvailable = function() {
+                    return true; // Always show widget
+                };
+            }
+            
+            // Override hide method
+            if (prototype.hide) {
+                prototype.hide = function() {
+                    console.log('AI keeping chat widget visible');
+                    // Don't hide
+                };
+            }
+        }
     }
 
     interceptOdooMessages() {
@@ -124,24 +174,55 @@ class OdooAIChat {
     }
 
     displayAIMessage(message) {
-        // Find the chat messages container
-        const messagesContainer = document.querySelector('.o_thread_message_list, .o_livechat_thread, .o_mail_thread');
+        // Add user message first (simulate what user typed)
+        this.addUserMessage(this.conversationHistory[this.conversationHistory.length - 1].content);
+        
+        // Then add AI response
+        setTimeout(() => {
+            const messagesContainer = document.querySelector('.o_thread_message_list, .o_livechat_thread, .o_mail_thread, .o_mail_chatter');
+            
+            if (messagesContainer) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'o_thread_message o_mail_message';
+                messageDiv.innerHTML = `
+                    <div class="o_thread_message_sidebar">
+                        <div class="o_thread_message_avatar">
+                            <span class="o_avatar" style="background: #0d6efd; color: white; font-size: 12px; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">AI</span>
+                        </div>
+                    </div>
+                    <div class="o_thread_message_main">
+                        <div class="o_thread_message_core">
+                            <div class="o_thread_message_author" style="font-weight: bold; color: #0d6efd;">AI Assistant</div>
+                            <div class="o_thread_message_content">
+                                <div class="o_thread_message_body" style="margin-top: 5px;">${message}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }, 500);
+    }
+
+    addUserMessage(message) {
+        const messagesContainer = document.querySelector('.o_thread_message_list, .o_livechat_thread, .o_mail_thread, .o_mail_chatter');
         
         if (messagesContainer) {
-            // Create AI message element
             const messageDiv = document.createElement('div');
             messageDiv.className = 'o_thread_message o_mail_message';
             messageDiv.innerHTML = `
                 <div class="o_thread_message_sidebar">
                     <div class="o_thread_message_avatar">
-                        <span class="o_avatar o_thread_message_avatar" style="background: #0d6efd; color: white; font-size: 12px;">AI</span>
+                        <span class="o_avatar" style="background: #6c757d; color: white; font-size: 12px; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">You</span>
                     </div>
                 </div>
                 <div class="o_thread_message_main">
                     <div class="o_thread_message_core">
-                        <div class="o_thread_message_author">AI Assistant</div>
+                        <div class="o_thread_message_author" style="font-weight: bold;">You</div>
                         <div class="o_thread_message_content">
-                            <div class="o_thread_message_body">${message}</div>
+                            <div class="o_thread_message_body" style="margin-top: 5px;">${message}</div>
                         </div>
                     </div>
                 </div>
@@ -168,6 +249,13 @@ window.addEventListener('load', () => {
 const observer = new MutationObserver(() => {
     if (document.querySelector('.o_livechat_button') && !window.odooAIChat) {
         window.odooAIChat = new OdooAIChat();
+    }
+    
+    // Keep widget visible
+    const chatButton = document.querySelector('.o_livechat_button');
+    if (chatButton && chatButton.style.display === 'none') {
+        chatButton.style.display = 'block';
+        chatButton.style.visibility = 'visible';
     }
 });
 observer.observe(document.body, { childList: true, subtree: true });
