@@ -3,24 +3,20 @@ class OdooAIChat {
     constructor() {
         this.aiMode = true;
         this.conversationHistory = [];
-        this.odooLoaded = false;
         this.sessionId = this.generateSessionId();
-        
         this.init();
     }
 
     init() {
-        // Wait for Odoo to load, then intercept
         this.waitForOdoo();
     }
 
     waitForOdoo() {
-        // Check if Odoo livechat is available
         const checkOdoo = () => {
             if (window.odoo && window.odoo.im_livechat) {
                 this.setupOdooIntegration();
             } else {
-                setTimeout(checkOdoo, 500);
+                setTimeout(checkOdoo, 1000);
             }
         };
         checkOdoo();
@@ -29,31 +25,38 @@ class OdooAIChat {
     setupOdooIntegration() {
         console.log('Setting up Odoo AI integration...');
         
-        // Override Odoo's message sending
-        const originalLivechat = window.odoo.im_livechat;
-        
-        // Intercept when user sends message
-        if (originalLivechat && originalLivechat.LivechatButton) {
-            const originalSend = originalLivechat.LivechatButton.prototype._sendMessage;
-            
-            originalLivechat.LivechatButton.prototype._sendMessage = (message) => {
-                if (this.aiMode) {
-                    this.handleWithAI(message);
-                } else {
-                    // Send to human agent
-                    originalSend.call(this, message);
-                }
-            };
-        }
-
-        this.odooLoaded = true;
+        // Wait for Odoo widget to be fully loaded
+        const waitForWidget = () => {
+            if (window.odoo.im_livechat.LivechatButton) {
+                this.interceptOdooMessages();
+            } else {
+                setTimeout(waitForWidget, 500);
+            }
+        };
+        waitForWidget();
     }
 
-    async handleWithAI(message) {
+    interceptOdooMessages() {
+        // Override the message sending in Odoo
+        const self = this;
+        
+        // Hook into Odoo's message sending
+        const originalPrototype = window.odoo.im_livechat.LivechatButton.prototype;
+        const originalSendMessage = originalPrototype._sendMessage;
+        
+        originalPrototype._sendMessage = function(content) {
+            if (self.aiMode) {
+                self.handleWithAI(content, this);
+            } else {
+                originalSendMessage.call(this, content);
+            }
+        };
+    }
+
+    async handleWithAI(message, odooWidget) {
         this.conversationHistory.push({role: 'user', content: message});
         
         try {
-            // Call your existing AI endpoint
             const response = await fetch('/api/ai-chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -67,66 +70,54 @@ class OdooAIChat {
             const aiResponse = await response.json();
             
             if (aiResponse.needsHandoff) {
-                await this.handoffToHuman(message);
+                this.handoffToHuman(message, odooWidget);
             } else {
-                this.displayAIMessage(aiResponse.message);
+                this.displayAIMessage(aiResponse.message, odooWidget);
                 this.conversationHistory.push({role: 'assistant', content: aiResponse.message});
             }
         } catch (error) {
             console.error('AI Error:', error);
-            this.displayAIMessage("I'm having trouble right now. Let me connect you to a human agent.");
-            await this.handoffToHuman(message);
+            this.displayAIMessage("I'm having trouble right now. Let me connect you to a human agent.", odooWidget);
+            this.handoffToHuman(message, odooWidget);
         }
     }
 
-    async handoffToHuman(originalMessage) {
+    handoffToHuman(originalMessage, odooWidget) {
         this.aiMode = false;
         
         // Display handoff message
-        this.displayAIMessage("Let me connect you to one of our human agents who can better assist you...");
+        this.displayAIMessage("Let me connect you to one of our human agents...", odooWidget);
         
-        // Send conversation history to Odoo
-        const historyText = this.conversationHistory.map(msg => 
-            `${msg.role === 'user' ? 'Customer' : 'AI'}: ${msg.content}`
-        ).join('\\n');
-        
-        // Use Odoo's internal messaging to send history
+        // Send the original message to human agent
         setTimeout(() => {
-            if (window.odoo && window.odoo.im_livechat) {
-                const livechat = window.odoo.im_livechat;
-                if (livechat.widget && livechat.widget._sendMessage) {
-                    livechat.widget._sendMessage(`Previous AI conversation:\\n${historyText}\\n\\nCustomer: ${originalMessage}`);
-                }
-            }
+            const originalSendMessage = window.odoo.im_livechat.LivechatButton.prototype._sendMessage;
+            originalSendMessage.call(odooWidget, originalMessage);
         }, 1000);
     }
 
-    displayAIMessage(message) {
-        // Display message in Odoo chat interface
-        if (window.odoo && window.odoo.im_livechat && window.odoo.im_livechat.widget) {
-            const widget = window.odoo.im_livechat.widget;
-            
-            // Create message element similar to Odoo's format
-            const messageData = {
-                id: Date.now(),
-                body: message,
-                author_id: [0, 'AI Assistant'],
-                date: new Date().toISOString(),
-            };
-            
-            // Add to chat
-            if (widget._addMessage) {
-                widget._addMessage(messageData);
-            }
+    displayAIMessage(message, odooWidget) {
+        // Create a fake message from AI in Odoo format
+        const messageElement = {
+            id: Date.now(),
+            body: message,
+            author_id: [0, 'AI Assistant'],
+            date: new Date().toISOString()
+        };
+        
+        // Add message to Odoo chat
+        if (odooWidget && odooWidget._addMessage) {
+            odooWidget._addMessage(messageElement);
         }
     }
 
     generateSessionId() {
-        return 'ai_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        return 'odoo_ai_' + Math.random().toString(36).substr(2, 9);
     }
 }
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    window.odooAIChat = new OdooAIChat();
+// Initialize when page loads
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        window.odooAIChat = new OdooAIChat();
+    }, 2000);
 });
