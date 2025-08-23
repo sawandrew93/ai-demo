@@ -1186,8 +1186,7 @@ function handleAcceptRequest(sessionId, agentId) {
       type: 'customer_assigned',
       sessionId,
       history: conversation.messages,
-      queuePosition: 0,
-
+      queuePosition: 0
     }));
     console.log(`✅ Customer assigned message sent to agent ${agentData.user.name}`);
   } else {
