@@ -1402,6 +1402,29 @@ async function handleHumanRequest(sessionId, customerInfo = null) {
   console.log(`Human request added to queue for session ${sessionId}, position ${queuePosition}`);
 }
 
+// ========== AI CHAT API FOR ODOO INTEGRATION ========== //
+app.post('/api/ai-chat', async (req, res) => {
+  try {
+    const { message, history, sessionId } = req.body;
+    
+    // Use existing AI response generation
+    const aiResponse = await generateAIResponse(message, history || []);
+    
+    res.json({
+      message: aiResponse.message,
+      needsHandoff: aiResponse.type === 'handoff_suggestion' || aiResponse.type === 'no_knowledge',
+      sources: aiResponse.sources || [],
+      confidence: aiResponse.confidence || 0
+    });
+  } catch (error) {
+    console.error('AI Chat API error:', error);
+    res.status(500).json({
+      message: "I'm having trouble right now. Let me connect you to a human agent.",
+      needsHandoff: true
+    });
+  }
+});
+
 // ========== ENHANCED MESSAGE HANDLING ========== //
 async function handleWebSocketMessage(ws, data) {
   try {
